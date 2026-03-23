@@ -16,9 +16,16 @@ const allowedOrigins = parseOrigins(env.CORS_ALLOWED_ORIGINS);
 const finalOrigin = allowedOrigins.includes("*") ? "*" : allowedOrigins;
 
 export const corsConfig = cors({
-    origin: finalOrigin,
+    origin: (origin) => {
+        // If wildcard is allowed, return the actual origin of the request 
+        // to support Fetch with credentials (which fails if origin is *)
+        if (allowedOrigins.includes("*")) return origin;
+        
+        // Otherwise, check if the origin is in our allowed list
+        return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    },
     allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Client-Id", "apikey"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Client-Id", "apikey", "Access-Control-Allow-Origin"],
     exposeHeaders: ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-Cache-Status"],
     maxAge: 600, // 10 minutes
     credentials: true,

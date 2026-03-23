@@ -61,9 +61,9 @@ app.get("/health", (c) => c.text("daijoubu", { status: 200 }));
 
 app.get("/version", (c) =>
     c.json({
-        name: pkgJson.name,
-        version: pkgJson.version,
-        description: pkgJson.description,
+        name: "tatakai-api",
+        version: VERSION,
+        description: "Unified anime API combines HiAnime, Consumet, and regional scrapers",
     })
 );
 
