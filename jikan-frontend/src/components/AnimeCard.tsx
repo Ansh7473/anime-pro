@@ -5,10 +5,9 @@ import { useNavigate } from 'react-router-dom';
 
 interface AnimeCardProps {
   anime: any;
-  isLargeRow?: boolean;
 }
 
-const AnimeCard: React.FC<AnimeCardProps> = ({ anime, isLargeRow }) => {
+const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
   const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
   const timeoutRef = useRef<any>(null);
