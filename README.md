@@ -1,4 +1,4 @@
-# Jikan Anime Streaming Platform - Resume Bullet Points
+# Jikan Anime Streaming Platform 
 
 ## Project Overview
 Full-stack anime streaming platform with separate backend and frontend applications, featuring content aggregation from multiple providers, user authentication, and video streaming capabilities.
