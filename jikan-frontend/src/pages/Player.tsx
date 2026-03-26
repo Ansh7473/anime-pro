@@ -14,7 +14,16 @@ const HlsPlayer = ({ src }: { src: string }) => {
     if (!video || !src) return;
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ maxBufferLength: 60, enableWorker: true });
+      const hls = new Hls({ 
+        maxBufferLength: 60, 
+        enableWorker: true,
+        xhrSetup: (xhr, url) => {
+          // Bypass CORS restrictions for m3u8 playlists and ts segments
+          if (url.includes('.m3u8') || url.includes('.ts')) {
+             xhr.open('GET', `https://corsproxy.io/?url=${encodeURIComponent(url)}`, true);
+          }
+        }
+      });
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => { }); });
