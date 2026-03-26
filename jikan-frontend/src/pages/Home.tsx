@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import TopLists from '../components/TopLists';
 import { HeroBannerSkeleton, RowSkeleton } from '../components/Skeleton';
 import ContinueWatching from '../components/ContinueWatching';
+import { useWatchHistory } from '../hooks/useWatchHistory';
 
 const Home = () => {
   const [sections, setSections] = useState<any[]>([]);
@@ -13,20 +14,7 @@ const Home = () => {
   const [spotlight, setSpotlight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [continueWatching, setContinueWatching] = useState<any[]>([]);
-
-  // Load continue watching from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('continueWatching');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setContinueWatching(parsed);
-      } catch (e) {
-        console.error('Failed to parse continue watching data', e);
-      }
-    }
-  }, []);
+  const { watchHistory, removeFromWatchHistory } = useWatchHistory();
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -58,8 +46,6 @@ const Home = () => {
         }
 
         const normalizeItem = (item: any) => normalize(item);
-
-        const trendingGlobal = (data.trendingGlobal || []).map(normalizeItem);
         const topAnime = (data.topAnime || []).map(normalizeItem);
         const recommendations = (data.recommendations || []).map(normalizeItem);
         const latest = (data.latest || []).map(normalizeItem);
@@ -87,7 +73,6 @@ const Home = () => {
         if (hianimeSpotlight.length > 0) built.push({ title: '🔥 Spotlight Anime', items: hianimeSpotlight });
         if (hianimeTopAiring.length > 0) built.push({ title: '📡 Top Airing Now', items: hianimeTopAiring });
 
-        if (trendingGlobal.length > 0) built.push({ title: 'Trending Worldwide', items: trendingGlobal });
         if (latest.length > 0) built.push({ title: 'Latest Episodes', items: latest });
         if (tvShows.length > 0) built.push({ title: 'TV Shows', items: tvShows });
         if (movies.length > 0) built.push({ title: 'Movies', items: movies });
@@ -155,14 +140,19 @@ const Home = () => {
 
           <div style={{ marginTop: '-120px', position: 'relative', zIndex: 10 }}>
             {/* Continue Watching Section */}
-            {continueWatching.length > 0 && (
+            {watchHistory.length > 0 && (
               <ContinueWatching
-                items={continueWatching}
-                onRemove={(animeId) => {
-                  const updated = continueWatching.filter((item: any) => item.animeId !== animeId);
-                  setContinueWatching(updated);
-                  localStorage.setItem('continueWatching', JSON.stringify(updated));
-                }}
+                items={watchHistory.slice(0, 3).map(item => ({
+                  animeId: item.anime_id,
+                  animeTitle: item.anime_title,
+                  animePoster: item.anime_poster,
+                  episodeNumber: item.episode_number,
+                  episodeTitle: item.episode_title || `Episode ${item.episode_number}`,
+                  progress: item.total_seconds > 0 ? (item.progress_seconds / item.total_seconds) * 100 : 0,
+                  lastWatched: new Date(item.watched_at).getTime(),
+                  totalEpisodes: 0
+                }))}
+                onRemove={removeFromWatchHistory}
               />
             )}
             {sections.length > 0 ? (

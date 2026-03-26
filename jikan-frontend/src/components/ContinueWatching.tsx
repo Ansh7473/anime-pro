@@ -50,30 +50,14 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                 </span>
             </div>
 
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '1.5rem'
-            }}>
+            <div className="continue-watching-grid">
                 {items.map((item, index) => (
                     <motion.div
                         key={item.animeId}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: index * 0.1 }}
-                        style={{
-                            position: 'relative',
-                            borderRadius: '12px',
-                            overflow: 'hidden',
-                            backgroundColor: 'var(--net-bg-lite)',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            transition: 'all 0.3s ease'
-                        }}
-                        whileHover={{
-                            transform: 'translateY(-4px)',
-                            borderColor: 'rgba(255,255,255,0.15)',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
-                        }}
+                        className="continue-watching-card"
                     >
                         {/* Remove button */}
                         {onRemove && (
@@ -82,13 +66,14 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                     e.preventDefault();
                                     onRemove(item.animeId);
                                 }}
+                                className="remove-btn"
                                 style={{
                                     position: 'absolute',
                                     top: '8px',
                                     right: '8px',
                                     zIndex: 10,
-                                    width: '32px',
-                                    height: '32px',
+                                    width: '28px',
+                                    height: '28px',
                                     borderRadius: '50%',
                                     backgroundColor: 'rgba(0,0,0,0.7)',
                                     border: 'none',
@@ -97,21 +82,20 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    opacity: 0,
                                     transition: 'opacity 0.2s'
                                 }}
-                                className="remove-btn"
                             >
-                                <X size={16} />
+                                <X size={14} />
                             </button>
                         )}
 
                         <Link
                             to={`/watch/${item.animeId}/${item.episodeNumber}`}
-                            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+                            style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', height: '100%' }}
+                            className="card-link"
                         >
                             {/* Thumbnail */}
-                            <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden' }}>
+                            <div className="card-thumbnail" style={{ position: 'relative', overflow: 'hidden' }}>
                                 <img
                                     src={item.animePoster}
                                     alt={item.animeTitle}
@@ -127,7 +111,7 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                 />
 
                                 {/* Play overlay */}
-                                <div style={{
+                                <div className="play-overlay" style={{
                                     position: 'absolute',
                                     top: 0,
                                     left: 0,
@@ -137,33 +121,32 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    opacity: 0,
                                     transition: 'opacity 0.3s ease'
-                                }} className="play-overlay">
+                                }}>
                                     <div style={{
-                                        width: '56px',
-                                        height: '56px',
+                                        width: '40px',
+                                        height: '40px',
                                         borderRadius: '50%',
                                         backgroundColor: 'var(--net-red)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        boxShadow: '0 4px 20px rgba(229,9,20,0.5)'
+                                        boxShadow: '0 4px 15px rgba(229,9,20,0.5)'
                                     }}>
-                                        <Play fill="white" size={24} style={{ marginLeft: '4px' }} />
+                                        <Play fill="white" size={18} style={{ marginLeft: '2px' }} />
                                     </div>
                                 </div>
 
                                 {/* Episode badge */}
                                 <div style={{
                                     position: 'absolute',
-                                    top: '8px',
-                                    left: '8px',
+                                    top: '6px',
+                                    left: '6px',
                                     backgroundColor: 'rgba(0,0,0,0.8)',
                                     color: 'white',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
                                     fontWeight: 700,
                                     backdropFilter: 'blur(8px)'
                                 }}>
@@ -171,46 +154,46 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                 </div>
 
                                 {/* Time ago badge */}
-                                <div style={{
+                                <div className="time-badge" style={{
                                     position: 'absolute',
-                                    bottom: '8px',
-                                    right: '8px',
+                                    bottom: '6px',
+                                    right: '6px',
                                     backgroundColor: 'rgba(0,0,0,0.8)',
                                     color: 'var(--net-text-muted)',
-                                    padding: '4px 8px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.7rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.6rem',
                                     fontWeight: 600,
                                     backdropFilter: 'blur(8px)',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px'
+                                    gap: '3px'
                                 }}>
-                                    <Clock size={12} />
+                                    <Clock size={10} />
                                     {formatTimeAgo(item.lastWatched)}
                                 </div>
                             </div>
 
                             {/* Content */}
-                            <div style={{ padding: '1rem' }}>
-                                <h3 style={{
-                                    fontSize: '0.95rem',
+                            <div className="card-content" style={{ padding: '0.75rem' }}>
+                                <h3 className="card-title" style={{
+                                    fontSize: '0.85rem',
                                     fontWeight: 700,
                                     color: 'white',
-                                    margin: '0 0 0.5rem 0',
+                                    margin: '0 0 0.25rem 0',
                                     lineHeight: 1.3,
                                     display: '-webkit-box',
-                                    WebkitLineClamp: 2,
+                                    WebkitLineClamp: 1,
                                     WebkitBoxOrient: 'vertical',
                                     overflow: 'hidden'
                                 }}>
                                     {item.animeTitle}
                                 </h3>
 
-                                <p style={{
-                                    fontSize: '0.8rem',
+                                <p className="card-subtitle" style={{
+                                    fontSize: '0.75rem',
                                     color: 'var(--net-text-muted)',
-                                    margin: '0 0 0.75rem 0',
+                                    margin: '0 0 0.5rem 0',
                                     display: '-webkit-box',
                                     WebkitLineClamp: 1,
                                     WebkitBoxOrient: 'vertical',
@@ -223,26 +206,84 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
                                 <EpisodeProgress
                                     current={item.episodeNumber}
                                     total={item.totalEpisodes || 12}
-                                    showLabel
                                 />
                             </div>
                         </Link>
 
                         <style>{`
-              .remove-btn {
-                opacity: 0 !important;
+              .continue-watching-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 1.25rem;
               }
-              .play-overlay {
-                opacity: 0 !important;
+              .continue-watching-card {
+                position: relative;
+                border-radius: 10px;
+                overflow: hidden;
+                background-color: var(--net-bg-lite);
+                border: 1px solid rgba(255,255,255,0.05);
+                transition: all 0.3s ease;
               }
-              a:hover .remove-btn {
-                opacity: 1 !important;
+              .card-thumbnail {
+                aspect-ratio: 16/9;
               }
-              a:hover .play-overlay {
-                opacity: 1 !important;
+              .remove-btn, .play-overlay {
+                opacity: 0;
               }
-              a:hover img {
+              .continue-watching-card:hover {
+                transform: translateY(-4px);
+                border-color: rgba(255,255,255,0.15);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+              }
+              .continue-watching-card:hover .remove-btn, 
+              .continue-watching-card:hover .play-overlay {
+                opacity: 1;
+              }
+              .continue-watching-card:hover img {
                 transform: scale(1.05);
+              }
+
+              @media (max-width: 600px) {
+                .continue-watching-grid {
+                  grid-template-columns: 1fr;
+                  gap: 0.75rem;
+                }
+                .card-link {
+                  flex-direction: row !important;
+                  align-items: center;
+                  height: 90px !important;
+                }
+                .card-thumbnail {
+                  width: 140px;
+                  height: 100% !important;
+                  aspect-ratio: auto !important;
+                  flex-shrink: 0;
+                }
+                .card-content {
+                  padding: 0.5rem 0.75rem !important;
+                  flex-grow: 1;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: center;
+                }
+                .card-title {
+                  font-size: 0.8rem !important;
+                  -webkit-line-clamp: 2 !important;
+                }
+                .card-subtitle {
+                  font-size: 0.7rem !important;
+                  margin-bottom: 0.25rem !important;
+                }
+                .remove-btn {
+                  opacity: 1 !important;
+                  top: 4px !important;
+                  right: 4px !important;
+                  width: 24px !important;
+                  height: 24px !important;
+                }
+                .time-badge {
+                  display: none !important;
+                }
               }
             `}</style>
                     </motion.div>

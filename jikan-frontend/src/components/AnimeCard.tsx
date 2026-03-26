@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Plus, ThumbsUp, ChevronDown, Eye, Star, Clock } from 'lucide-react';
+import { Play, Plus, ThumbsUp, ChevronDown, Eye, Star, Clock, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useFavorites } from '../hooks/useFavorites';
 
 interface AnimeCardProps {
   anime: any;
@@ -21,6 +22,18 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
   const synopsis = anime.synopsis || '';
   const genres = anime.genres || [];
   const studios = anime.studios || [];
+
+  const { isFavorite: checkFavorite, addFavorite, removeFavorite } = useFavorites();
+  const isFavorite = id && checkFavorite(id);
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isFavorite) {
+      removeFavorite(id);
+    } else {
+      addFavorite(anime);
+    }
+  };
 
   const handleMouseEnter = () => {
     timeoutRef.current = setTimeout(() => setIsHovered(true), 400);
@@ -186,10 +199,17 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
                   <Play fill="white" color="white" size={15} style={{ marginLeft: '2px' }} />
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.12, backgroundColor: 'rgba(255,255,255,0.18)' }}
-                  style={{ borderRadius: '50%', width: '34px', height: '34px', backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}
+                  whileHover={{ scale: 1.12, backgroundColor: isFavorite ? 'rgba(229,9,20,0.2)' : 'rgba(255,255,255,0.18)' }}
+                  onClick={handleToggleFavorite}
+                  style={{ 
+                    borderRadius: '50%', width: '34px', height: '34px', 
+                    backgroundColor: isFavorite ? 'rgba(229,9,20,0.1)' : 'rgba(255,255,255,0.07)', 
+                    border: '1px solid ' + (isFavorite ? 'var(--net-red)' : 'rgba(255,255,255,0.22)'), 
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    color: isFavorite ? 'var(--net-red)' : 'white' 
+                  }}
                 >
-                  <Plus size={15} />
+                  {isFavorite ? <Heart size={15} fill="var(--net-red)" /> : <Plus size={15} />}
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.12, backgroundColor: 'rgba(255,255,255,0.18)' }}

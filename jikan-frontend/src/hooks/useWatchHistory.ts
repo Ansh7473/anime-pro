@@ -3,7 +3,7 @@
  * Works WITHOUT login: data is saved to localStorage.
  * If logged in, syncs with Supabase.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,12 +33,12 @@ function loadFromStorage(): WatchHistoryItem[] {
     }
 }
 
-function saveToStorage(items: WatchHistoryItem[]) {
+function saveToStorage(items: WatchHistoryItem[], sourceId?: string) {
     try {
         // Keep only latest MAX_LOCAL_ITEMS
         const trimmed = items.slice(0, MAX_LOCAL_ITEMS);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-        window.dispatchEvent(new Event('history_updated'));
+        window.dispatchEvent(new CustomEvent('history_updated', { detail: { sourceId } }));
     } catch { /* silent */ }
 }
 
@@ -85,12 +85,16 @@ export const useWatchHistory = () => {
         };
         init();
 
-        const handleUpdate = () => {
-            setWatchHistory(loadFromStorage());
+        const handleUpdate = (e: any) => {
+            if (e.detail?.sourceId !== instanceId.current) {
+                setWatchHistory(loadFromStorage());
+            }
         };
         window.addEventListener('history_updated', handleUpdate);
         return () => window.removeEventListener('history_updated', handleUpdate);
     }, [user]);
+
+    const instanceId = useRef(Math.random().toString(36).substr(2, 9));
 
     const addToWatchHistory = useCallback(async (
         anime: any,
@@ -115,15 +119,20 @@ export const useWatchHistory = () => {
         };
 
         setWatchHistory(prev => {
-            // Update existing or insert at top
-            const exists = prev.findIndex(h => h.anime_id === animeId && h.episode_number === episodeNumber);
+            // Find if episode already in history
+            const existingIdx = prev.findIndex(i =>
+                i.anime_id === String(animeId) && i.episode_number === episodeNumber
+            );
+
             let updated: WatchHistoryItem[];
-            if (exists >= 0) {
-                updated = [{ ...prev[exists], ...newItem }, ...prev.filter((_, i) => i !== exists)];
+            if (existingIdx > -1) {
+                updated = [...prev];
+                updated[existingIdx] = newItem;
             } else {
                 updated = [newItem, ...prev];
             }
-            saveToStorage(updated);
+
+            setTimeout(() => saveToStorage(updated, instanceId.current), 0);
             return updated;
         });
 

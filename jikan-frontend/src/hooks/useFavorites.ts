@@ -3,7 +3,7 @@
  * Works WITHOUT login: data is saved to localStorage.
  * If the user is logged in, it also syncs to Supabase so favorites are available across devices.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,10 +27,10 @@ function loadFromStorage(): Favorite[] {
     }
 }
 
-function saveToStorage(favs: Favorite[]) {
+function saveToStorage(favs: Favorite[], sourceId?: string) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
-        window.dispatchEvent(new Event('favorites_updated'));
+        window.dispatchEvent(new CustomEvent('favorites_updated', { detail: { sourceId } }));
     } catch { /* silent fail */ }
 }
 
@@ -83,17 +83,23 @@ export const useFavorites = () => {
         };
         init();
 
-        const handleUpdate = () => {
-            setFavorites(loadFromStorage());
+        const handleUpdate = (e: any) => {
+            // Only update if the event came from a different instance
+            if (e.detail?.sourceId !== instanceId.current) {
+                setFavorites(loadFromStorage());
+            }
         };
         window.addEventListener('favorites_updated', handleUpdate);
         return () => window.removeEventListener('favorites_updated', handleUpdate);
     }, [user]);
 
+    const instanceId = useRef(Math.random().toString(36).substr(2, 9));
+
     const addFavorite = useCallback(async (anime: any): Promise<{ error?: any }> => {
+        const animeIdStr = String(anime.id || anime.mal_id);
         const newFav: Favorite = {
-            id: `local_${Date.now()}_${anime.id}`,
-            anime_id: String(anime.id || anime.mal_id),
+            id: `local_${Date.now()}_${animeIdStr}`,
+            anime_id: animeIdStr,
             anime_title: anime.title || 'Unknown',
             anime_poster: anime.poster || anime.image || '',
             created_at: new Date().toISOString(),
@@ -102,7 +108,8 @@ export const useFavorites = () => {
         setFavorites(prev => {
             if (prev.some(f => f.anime_id === newFav.anime_id)) return prev;
             const updated = [newFav, ...prev];
-            saveToStorage(updated);
+            // Side effect after state update
+            setTimeout(() => saveToStorage(updated, instanceId.current), 0);
             return updated;
         });
 
@@ -124,9 +131,10 @@ export const useFavorites = () => {
     }, [user]);
 
     const removeFavorite = useCallback(async (animeId: string): Promise<{ error?: any }> => {
+        const animeIdStr = String(animeId);
         setFavorites(prev => {
-            const updated = prev.filter(f => f.anime_id !== animeId);
-            saveToStorage(updated);
+            const updated = prev.filter(f => f.anime_id !== animeIdStr);
+            setTimeout(() => saveToStorage(updated, instanceId.current), 0);
             return updated;
         });
 

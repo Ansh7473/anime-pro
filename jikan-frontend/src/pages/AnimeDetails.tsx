@@ -5,6 +5,7 @@ import { animeAPI } from '../api/client';
 import { motion } from 'framer-motion';
 import Row from '../components/Row';
 import { PageSkeleton } from '../components/Skeleton';
+import { useFavorites } from '../hooks/useFavorites';
 
 const AnimeDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,53 +15,15 @@ const AnimeDetails = () => {
   const [relatedAnimes, setRelatedAnimes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isFavorite, setIsFavorite] = useState(false);
+  const { isFavorite: checkFavorite, addFavorite, removeFavorite } = useFavorites();
+  const isFavorite = id ? checkFavorite(id) : false;
 
-  // Check if anime is in favorites
-  useEffect(() => {
-    if (id) {
-      try {
-        const saved = localStorage.getItem('favorites');
-        if (saved) {
-          const favorites = JSON.parse(saved);
-          setIsFavorite(favorites.some((fav: any) => fav.id === id));
-        }
-      } catch (e) {
-        console.error('Failed to check favorites', e);
-      }
-    }
-  }, [id]);
-
-  // Toggle favorite
-  const toggleFavorite = () => {
-    if (!anime) return;
-
-    try {
-      const saved = localStorage.getItem('favorites');
-      let favorites: any[] = saved ? JSON.parse(saved) : [];
-
-      if (isFavorite) {
-        // Remove from favorites
-        favorites = favorites.filter((fav: any) => fav.id !== id);
-        setIsFavorite(false);
-      } else {
-        // Add to favorites
-        favorites.unshift({
-          id: id,
-          title: anime.title,
-          poster: anime.image,
-          rating: parseFloat(anime.metadata.rating?.replace('⭐ ', '').replace('/10', '')) || 0,
-          year: anime.metadata.premiered?.split(' ')[1] || 'Unknown',
-          episodes: anime.metadata.episodes || 0,
-          genres: anime.genres || [],
-          addedAt: Date.now()
-        });
-        setIsFavorite(true);
-      }
-
-      localStorage.setItem('favorites', JSON.stringify(favorites));
-    } catch (e) {
-      console.error('Failed to toggle favorite', e);
+  const handleFavoriteToggle = () => {
+    if (!anime || !id) return;
+    if (isFavorite) {
+      removeFavorite(id);
+    } else {
+      addFavorite(anime);
     }
   };
 
@@ -299,7 +262,7 @@ const AnimeDetails = () => {
                   </button>
                 </Link>
                 <button
-                  onClick={toggleFavorite}
+                  onClick={handleFavoriteToggle}
                   style={{
                     border: '2px solid ' + (isFavorite ? 'var(--net-red)' : 'rgba(255,255,255,0.4)'),
                     borderRadius: '50%',
