@@ -109,7 +109,7 @@ export async function getAnimeHindiDubbedInfo(id: string): Promise<{ id: any; ti
 
                 if (endIndex === -1) {
                     console.log('[AnimeHindiDubbed] Could not find complete object');
-                    return [];
+                    return null;
                 }
 
                 const rawJson = scriptContent.substring(startIndex, endIndex);
