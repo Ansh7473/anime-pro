@@ -1,0 +1,9 @@
+export declare function searchDesiDub(query: string): Promise<any[]>;
+export declare function getDesiDubInfo(slug: string): Promise<{
+    title: string;
+    synopsis: string;
+    image: string | undefined;
+    episodes: any[];
+} | null>;
+export declare function getDesiDubSources(id: string): Promise<any[]>;
+//# sourceMappingURL=desidub.d.ts.map

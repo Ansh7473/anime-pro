@@ -1,123 +1,91 @@
 import * as cheerio from 'cheerio';
-
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
-
-const decodeB64 = (str: string) => {
+const decodeB64 = (str) => {
     try {
         return Buffer.from(str, 'base64').toString('utf-8');
-    } catch (e) { return ""; }
+    }
+    catch (e) {
+        return "";
+    }
 };
-
-export async function searchDesiDub(query: string) {
+export async function searchDesiDub(query) {
     try {
-        const url = `https://www.desidubanime.me/?s=${encodeURIComponent(query)}`;
-        console.log('[DesiDub] Searching:', url);
+        const url = `https://desidubanime.me/?s=${encodeURIComponent(query)}`;
         const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        console.log('[DesiDub] Response status:', res.status);
-        if (!res.ok) {
-            console.log('[DesiDub] Response not OK');
+        if (!res.ok)
             return [];
-        }
         const html = await res.text();
-        console.log('[DesiDub] HTML length:', html.length);
         const $ = cheerio.load(html);
-        const results: any[] = [];
-
-        // Try different selectors
-        const resultItems = $('.result-item');
-        console.log('[DesiDub] Found .result-item:', resultItems.length);
-
-        // Try alternative selectors
-        const altItems = $('.items .item');
-        console.log('[DesiDub] Found .items .item:', altItems.length);
-
-        const postItems = $('.post');
-        console.log('[DesiDub] Found .post:', postItems.length);
-
-        const articleItems = $('article');
-        console.log('[DesiDub] Found article:', articleItems.length);
-
-        // Log some HTML structure
-        const bodyHtml = $('body').html() || '';
-        console.log('[DesiDub] First 1000 chars of body:', bodyHtml.substring(0, 1000));
-
-        // Try to find any links that might be anime results
-        const allLinks = $('a[href*="/anime/"]');
-        console.log('[DesiDub] Found links with /anime/:', allLinks.length);
-        allLinks.each((_, el) => {
-            const href = $(el).attr('href');
-            const text = $(el).text().trim();
-            if (href && text) {
-                console.log('[DesiDub] Anime link:', { text, href });
-            }
-        });
-
-        resultItems.each((_, el) => {
+        const results = [];
+        $('.result-item').each((_, el) => {
             const title = $(el).find('.title a').text().trim();
             const href = $(el).find('.title a').attr('href');
             const slug = href?.split('/anime/')[1]?.replace(/\/$/, '');
             const image = $(el).find('img').attr('src');
-            console.log('[DesiDub] Result:', { title, slug, image });
-            if (slug) results.push({ title, slug, image });
+            if (slug)
+                results.push({ title, slug, image });
         });
-        console.log('[DesiDub] Total results:', results.length);
         return results;
-    } catch (e) {
+    }
+    catch (e) {
         console.error('[DesiDub Search Error]', e);
     }
     return [];
 }
-
-export async function getDesiDubInfo(slug: string) {
+export async function getDesiDubInfo(slug) {
     try {
-        const url = `https://www.desidubanime.me/anime/${slug}/`;
+        const url = `https://desidubanime.me/anime/${slug}/`;
         const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        if (!res.ok) return null;
+        if (!res.ok)
+            return null;
         const html = await res.text();
         const $ = cheerio.load(html);
-
-        const episodes: any[] = [];
+        const episodes = [];
         $('.episodios li').each((_, el) => {
             const href = $(el).find('a').attr('href');
             const epNum = $(el).find('.episodionum').text().trim();
             const date = $(el).find('.episodiodate').text().trim();
             const epSlug = href?.split('/watch/')[1]?.replace(/\/$/, '');
-            if (epSlug) episodes.push({ number: epNum, slug: epSlug, date });
+            if (epSlug)
+                episodes.push({ number: epNum, slug: epSlug, date });
         });
-
         return {
             title: $('.data h1').text().trim(),
             synopsis: $('.wp-content p').first().text().trim(),
             image: $('.poster img').attr('src'),
             episodes
         };
-    } catch (e) { console.error('[DesiDub Info Error]', e); }
+    }
+    catch (e) {
+        console.error('[DesiDub Info Error]', e);
+    }
     return null;
 }
-
-export async function getDesiDubSources(id: string) {
+export async function getDesiDubSources(id) {
     try {
-        const url = `https://www.desidubanime.me/watch/${id}/`;
+        const url = `https://desidubanime.me/watch/${id}/`;
         const response = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        if (!response.ok) return [];
+        if (!response.ok)
+            return [];
         const html = await response.text();
         const $ = cheerio.load(html);
-        const sources: any[] = [];
-
+        const sources = [];
         $("span[data-embed-id]").each((_, el) => {
             const embedData = $(el).attr("data-embed-id");
-            if (!embedData) return;
+            if (!embedData)
+                return;
             const [b64Name, b64Url] = embedData.split(":");
-            if (!b64Name || !b64Url) return;
+            if (!b64Name || !b64Url)
+                return;
             const serverName = decodeB64(b64Name);
             let finalUrl = decodeB64(b64Url);
-            if (!finalUrl || !serverName) return;
-
+            if (!finalUrl || !serverName)
+                return;
             if (finalUrl.includes("<iframe")) {
                 const iframeSrc = finalUrl.match(/src=['"]([^'"]+)['"]/)?.[1];
-                if (iframeSrc) finalUrl = iframeSrc;
+                if (iframeSrc)
+                    finalUrl = iframeSrc;
             }
-
             if (finalUrl && !finalUrl.includes("googletagmanager")) {
                 const isDub = serverName.toLowerCase().includes("dub") || serverName.toLowerCase().includes("hindi");
                 sources.push({
@@ -131,6 +99,10 @@ export async function getDesiDubSources(id: string) {
             }
         });
         return sources;
-    } catch (e) { console.error('[DesiDub Sources Error]', e); }
+    }
+    catch (e) {
+        console.error('[DesiDub Sources Error]', e);
+    }
     return [];
 }
+//# sourceMappingURL=desidub.js.map
