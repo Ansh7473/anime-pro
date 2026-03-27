@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { EpisodeProgress } from './ProgressBar';
 
 interface ContinueWatchingItem {
+    id?: string;
     animeId: string;
     animeTitle: string;
     animePoster: string;
@@ -53,7 +54,7 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ items, onRemove }) 
             <div className="continue-watching-grid">
                 {items.map((item, index) => (
                     <motion.div
-                        key={item.animeId}
+                        key={item.id || `${item.animeId}-${item.episodeNumber}`}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: index * 0.1 }}

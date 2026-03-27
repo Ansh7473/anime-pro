@@ -13,6 +13,7 @@ const AnimeDetails = () => {
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [recommendedAnimes, setRecommendedAnimes] = useState<any[]>([]);
   const [relatedAnimes, setRelatedAnimes] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { isFavorite: checkFavorite, addFavorite, removeFavorite } = useFavorites();
@@ -41,7 +42,9 @@ const AnimeDetails = () => {
         // Map Jikan API data to expected frontend structure
         setAnime({
           id: id,
-          title: animeData.title || animeData.title_english || 'Unknown Title',
+          title: animeData.title_english || animeData.title || 'Unknown Title',
+          title_english: animeData.title_english || '',
+          original_title: animeData.title || 'Unknown Title',
           description: animeData.synopsis || 'No description available.',
           image: animeData.images?.jpg?.large_image_url || animeData.images?.jpg?.image_url || '',
           banner: animeData.images?.jpg?.large_image_url || animeData.images?.jpg?.image_url || '',
@@ -57,7 +60,6 @@ const AnimeDetails = () => {
             type: animeData.type || 'Unknown',
             source: animeData.source || 'Unknown',
           },
-          seasons: [],
         });
 
         // Try to get episodes if available
@@ -154,6 +156,16 @@ const AnimeDetails = () => {
         } catch (err) {
           console.log('Could not fetch recommendations:', err);
           setRecommendedAnimes([]);
+        }
+
+        // Try to get seasons/relations
+        try {
+          const seasonsRes = await animeAPI.getAnimeRelations(id);
+          const seasonsData = seasonsRes.data?.data || [];
+          setSeasons(seasonsData);
+        } catch (err) {
+          console.log('Could not fetch seasons:', err);
+          setSeasons([]);
         }
 
         setRelatedAnimes([]);
@@ -302,26 +314,6 @@ const AnimeDetails = () => {
       </div>
 
       <div className="container" style={{ marginTop: '2rem' }}>
-        {/* Seasons */}
-        {anime.seasons.length > 0 && (
-          <div style={{ marginBottom: '3rem' }}>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.5rem' }}>Seasons</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-              {anime.seasons.map((season: any) => (
-                <Link key={season.id} to={`/anime/${season.id}`}
-                  style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', aspectRatio: '2/3', border: season.isCurrent ? '2px solid var(--net-red)' : '1px solid rgba(255,255,255,0.1)', display: 'block', transition: 'transform 0.3s' }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.03)')} onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}>
-                  <img src={season.poster} alt={season.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '1rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
-                    {season.isCurrent && <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--net-red)' }}>CURRENT</span>}
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', marginTop: '2px' }}>{season.title}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Episodes */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.6rem', fontWeight: 700 }}>Episodes</h3>
@@ -385,6 +377,26 @@ const AnimeDetails = () => {
             </div>
           )}
         </div>
+
+        {/* Seasons */}
+        {seasons.length > 0 && (
+          <div style={{ marginTop: '4rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.5rem' }}>Other Seasons & Related</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+              {seasons.map((season: any) => (
+                <Link key={season.id} to={`/anime/${season.id}`}
+                  style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', aspectRatio: '2/3', border: '1px solid rgba(255,255,255,0.1)', display: 'block', transition: 'transform 0.3s' }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.03)')} onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}>
+                  <img src={season.poster || anime.image} alt={season.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '1rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--net-text-muted)' }}>{season.relation?.toUpperCase()?.replace('_', ' ')}</span>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', marginTop: '2px' }}>{season.title}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Recommendations */}
         {recommendedAnimes.length > 0 && (

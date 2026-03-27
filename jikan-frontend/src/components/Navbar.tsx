@@ -77,7 +77,9 @@ const Navbar = () => {
             return {
               ...anime,
               id: anime.mal_id?.toString() || anime.id?.toString(),
-              title: anime.title || anime.name || 'Unknown Title',
+              title: anime.title_english || anime.title || anime.name || 'Unknown Title',
+              title_english: anime.title_english || '',
+              original_title: anime.title || anime.name || 'Unknown Title',
               poster: poster,
             };
           });

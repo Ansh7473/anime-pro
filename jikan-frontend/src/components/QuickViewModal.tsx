@@ -24,6 +24,9 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ anime, isOpen, onClose 
     const poster = anime.images?.jpg?.large_image_url || anime.poster || '';
     const title = anime.title || anime.name || 'Unknown Title';
     const titleEnglish = anime.title_english || '';
+    const originalTitle = anime.original_title || anime.title || anime.name || 'Unknown Title';
+    const displayTitle = titleEnglish || title;
+    const showOriginalTitle = titleEnglish && originalTitle && titleEnglish !== originalTitle;
     const score = anime.score || 0;
     const episodes = anime.episodes || '?';
     const type = anime.type || 'TV';
@@ -134,15 +137,25 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ anime, isOpen, onClose 
                                             marginBottom: '0.5rem',
                                             letterSpacing: '-0.02em'
                                         }}>
-                                            {title}
+                                            {displayTitle}
                                         </h2>
                                         {titleEnglish && titleEnglish !== title && (
                                             <p style={{
                                                 color: '#a3a3a3',
                                                 fontSize: '1.1rem',
-                                                marginBottom: '1rem'
+                                                marginBottom: '0.5rem'
                                             }}>
                                                 {titleEnglish}
+                                            </p>
+                                        )}
+                                        {showOriginalTitle && (
+                                            <p style={{
+                                                color: '#666',
+                                                fontSize: '0.95rem',
+                                                fontStyle: 'italic',
+                                                marginBottom: '1rem'
+                                            }}>
+                                                {originalTitle}
                                             </p>
                                         )}
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>

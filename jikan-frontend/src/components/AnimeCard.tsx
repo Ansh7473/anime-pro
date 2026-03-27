@@ -14,8 +14,12 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
   const timeoutRef = useRef<any>(null);
 
   const imageUrl = anime.poster || anime.image || '';
+  // Use English title if available, otherwise fallback to original title
   const title = anime.title || 'Unknown Title';
   const titleEnglish = anime.title_english || '';
+  const originalTitle = anime.original_title || anime.title || 'Unknown Title';
+  const displayTitle = titleEnglish || title;
+  const showOriginalTitle = titleEnglish && originalTitle && titleEnglish !== originalTitle;
   const id = anime.id;
   const score = anime.rating || anime.score || 0;
   const episodes = anime.episodes || 0;
@@ -86,7 +90,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
       }}>
         <motion.img
           src={imageUrl}
-          alt={title}
+          alt={displayTitle}
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
           whileHover={{ scale: 1.06 }}
           transition={{ duration: 0.4 }}
@@ -135,7 +139,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
             margin: '0 0 5px', lineHeight: '1.3',
             textShadow: '0 2px 6px rgba(0,0,0,0.7)'
           }}>
-            {title}
+            {displayTitle}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {episodes > 0 && (
@@ -173,7 +177,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
             <div style={{ position: 'relative', height: '145px', backgroundColor: '#0d0d0d' }}>
               <img
                 src={imageUrl}
-                alt={title}
+                alt={displayTitle}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
               />
               <div style={{
@@ -201,12 +205,12 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
                 <motion.button
                   whileHover={{ scale: 1.12, backgroundColor: isFavorite ? 'rgba(229,9,20,0.2)' : 'rgba(255,255,255,0.18)' }}
                   onClick={handleToggleFavorite}
-                  style={{ 
-                    borderRadius: '50%', width: '34px', height: '34px', 
-                    backgroundColor: isFavorite ? 'rgba(229,9,20,0.1)' : 'rgba(255,255,255,0.07)', 
-                    border: '1px solid ' + (isFavorite ? 'var(--net-red)' : 'rgba(255,255,255,0.22)'), 
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    color: isFavorite ? 'var(--net-red)' : 'white' 
+                  style={{
+                    borderRadius: '50%', width: '34px', height: '34px',
+                    backgroundColor: isFavorite ? 'rgba(229,9,20,0.1)' : 'rgba(255,255,255,0.07)',
+                    border: '1px solid ' + (isFavorite ? 'var(--net-red)' : 'rgba(255,255,255,0.22)'),
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: isFavorite ? 'var(--net-red)' : 'white'
                   }}
                 >
                   {isFavorite ? <Heart size={15} fill="var(--net-red)" /> : <Plus size={15} />}
@@ -244,10 +248,10 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime }) => {
 
               {/* Title */}
               <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'white', margin: '0 0 4px', lineHeight: 1.3 }} className="line-clamp-1">
-                {title}
+                {displayTitle}
               </h4>
-              {titleEnglish && titleEnglish !== title && (
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', margin: '0 0 7px' }} className="line-clamp-1">{titleEnglish}</p>
+              {showOriginalTitle && (
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', margin: '0 0 7px' }} className="line-clamp-1">{originalTitle}</p>
               )}
 
               {/* Genre chips */}

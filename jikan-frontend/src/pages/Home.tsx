@@ -4,7 +4,7 @@ import Row from '../components/Row';
 import { animeAPI, normalize, hianimeAPI, normalizeHianime } from '../api/client';
 import { motion } from 'framer-motion';
 import TopLists from '../components/TopLists';
-import { HeroBannerSkeleton, RowSkeleton } from '../components/Skeleton';
+import { CircularProgress } from '../components/Skeleton';
 import ContinueWatching from '../components/ContinueWatching';
 import { useWatchHistory } from '../hooks/useWatchHistory';
 
@@ -13,36 +13,83 @@ const Home = () => {
   const [topLists, setTopLists] = useState<any>(null);
   const [spotlight, setSpotlight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState('');
   const { watchHistory, removeFromWatchHistory } = useWatchHistory();
 
   useEffect(() => {
     const fetchHomeData = async () => {
       try {
-        console.log('Fetching home data...');
+        console.log('Fetching home data sequentially to avoid rate limiting...');
+        setLoadingProgress(0);
 
-        // Fetch Jikan and HiAnime data simultaneously
-        const [homeRes, seasonalRes, upcomingRes, spotlightRes, topAiringRes] = await Promise.allSettled([
-          animeAPI.getHome(),
-          animeAPI.getCurrentSeasonalAnime(),
-          animeAPI.getUpcomingSeasonalAnime(),
-          hianimeAPI.getSpotlight(),
-          hianimeAPI.getTopAiring(1),
-        ]);
+        // Fetch Jikan and HiAnime data SEQUENTIALLY to avoid rate limiting
+        // Order: 1. Home (top anime) -> 2. Current Seasonal -> 3. Upcoming -> 4. Spotlight -> 5. Top Airing
+        let homeRes, seasonalRes, upcomingRes, spotlightRes, topAiringRes;
 
-        const data: any = homeRes.status === 'fulfilled' ? (homeRes.value.data?.data || {}) : {};
+        try {
+          console.log('1. Fetching home data (top anime)...');
+          homeRes = await animeAPI.getHome();
+          setLoadingProgress(20); // 20% after first API
+        } catch (err) {
+          console.error('Failed to fetch home data:', err);
+          homeRes = { status: 'rejected' };
+          setLoadingProgress(20);
+        }
+
+        try {
+          console.log('2. Fetching current seasonal anime...');
+          seasonalRes = await animeAPI.getCurrentSeasonalAnime();
+          setLoadingProgress(40); // 40% after second API
+        } catch (err) {
+          console.error('Failed to fetch current seasonal anime:', err);
+          seasonalRes = { status: 'rejected' };
+          setLoadingProgress(40);
+        }
+
+        try {
+          console.log('3. Fetching upcoming seasonal anime...');
+          upcomingRes = await animeAPI.getUpcomingSeasonalAnime();
+          setLoadingProgress(60); // 60% after third API
+        } catch (err) {
+          console.error('Failed to fetch upcoming seasonal anime:', err);
+          upcomingRes = { status: 'rejected' };
+          setLoadingProgress(60);
+        }
+
+        try {
+          console.log('4. Fetching spotlight anime...');
+          spotlightRes = await hianimeAPI.getSpotlight();
+          setLoadingProgress(80); // 80% after fourth API
+        } catch (err) {
+          console.error('Failed to fetch spotlight anime:', err);
+          spotlightRes = { status: 'rejected' };
+          setLoadingProgress(80);
+        }
+
+        try {
+          console.log('5. Fetching top airing anime...');
+          topAiringRes = await hianimeAPI.getTopAiring(1);
+          setLoadingProgress(95); // 95% after fifth API
+        } catch (err) {
+          console.error('Failed to fetch top airing anime:', err);
+          topAiringRes = { status: 'rejected' };
+          setLoadingProgress(95);
+        }
+
+        const data: any = homeRes?.data?.data || {};
         const featured: any[] = data.featured || [];
 
         // Process HiAnime spotlight
         let hianimeSpotlight: any[] = [];
-        if (spotlightRes.status === 'fulfilled') {
-          hianimeSpotlight = (spotlightRes.value.data?.spotlightAnimes || []).map(normalizeHianime);
+        if (spotlightRes?.data?.spotlightAnimes) {
+          hianimeSpotlight = (spotlightRes.data.spotlightAnimes || []).map(normalizeHianime);
         }
 
         // Process HiAnime top airing
         let hianimeTopAiring: any[] = [];
-        if (topAiringRes.status === 'fulfilled') {
-          hianimeTopAiring = (topAiringRes.value.data?.results || []).map(normalizeHianime);
+        if (topAiringRes?.data?.results) {
+          hianimeTopAiring = (topAiringRes.data.results || []).map(normalizeHianime);
         }
 
         const normalizeItem = (item: any) => normalize(item);
@@ -54,12 +101,8 @@ const Home = () => {
         const todaySchedule = (data.todaySchedule || []).map(normalizeItem);
 
         // Process seasonal and upcoming anime
-        const seasonalData = seasonalRes.status === 'fulfilled'
-          ? (seasonalRes.value.data?.data || [])
-          : [];
-        const upcomingData = upcomingRes.status === 'fulfilled'
-          ? (upcomingRes.value.data?.data || [])
-          : [];
+        const seasonalData = seasonalRes?.data?.data || [];
+        const upcomingData = upcomingRes?.data?.data || [];
 
         setTopLists({
           airing: (data.topAiring || []).map(normalizeItem),
@@ -95,6 +138,7 @@ const Home = () => {
         console.error('Failed to fetch home data', err);
         setError(`Could not load home page: ${err.message || 'Unknown error'}`);
       } finally {
+        setLoadingProgress(100);
         setLoading(false);
       }
     };
@@ -126,12 +170,38 @@ const Home = () => {
       style={{ backgroundColor: 'var(--net-bg)', minHeight: '100vh', paddingBottom: '4rem' }}
     >
       {loading ? (
-        <div>
-          <HeroBannerSkeleton />
-          <div style={{ marginTop: '-120px', position: 'relative', zIndex: 10, padding: '0 4%' }}>
-            <RowSkeleton itemCount={6} />
-            <RowSkeleton itemCount={6} />
-            <RowSkeleton itemCount={6} />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'var(--net-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          gap: '1.5rem'
+        }}>
+          <CircularProgress progress={loadingProgress} size={80} strokeWidth={8} />
+          <div style={{
+            fontSize: '1.1rem',
+            fontWeight: 600,
+            color: 'var(--net-text)',
+            textAlign: 'center',
+            maxWidth: '300px'
+          }}>
+            {loadingProgress < 100 ? `Loading anime data... ${loadingProgress}%` : 'Almost ready!'}
+          </div>
+          <div style={{
+            fontSize: '0.85rem',
+            color: 'var(--net-text-muted)',
+            textAlign: 'center',
+            maxWidth: '400px',
+            lineHeight: 1.5
+          }}>
+            Fetching from multiple sources to give you the best experience
           </div>
         </div>
       ) : (
@@ -143,6 +213,7 @@ const Home = () => {
             {watchHistory.length > 0 && (
               <ContinueWatching
                 items={watchHistory.slice(0, 3).map(item => ({
+                  id: item.id,
                   animeId: item.anime_id,
                   animeTitle: item.anime_title,
                   animePoster: item.anime_poster,

@@ -122,6 +122,59 @@ export const ListItemSkeleton: React.FC = () => {
     );
 };
 
+// Circular Progress Component
+export const CircularProgress: React.FC<{ progress: number; size?: number; strokeWidth?: number }> = ({
+    progress,
+    size = 60,
+    strokeWidth = 6
+}) => {
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (progress / 100) * circumference;
+
+    return (
+        <div style={{ position: 'relative', width: size, height: size }}>
+            <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+                {/* Background circle */}
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.1)"
+                    strokeWidth={strokeWidth}
+                />
+                {/* Progress circle */}
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                />
+            </svg>
+            {/* Percentage text */}
+            <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                fontSize: size * 0.25,
+                fontWeight: 700,
+                color: 'white',
+                textAlign: 'center'
+            }}>
+                {Math.round(progress)}%
+            </div>
+        </div>
+    );
+};
+
 // Page Skeleton
 export const PageSkeleton: React.FC = () => {
     return (

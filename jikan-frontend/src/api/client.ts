@@ -25,7 +25,7 @@ export const hianimeClient = axios.create({ baseURL: `${BACKEND_URL}/consumet/an
 
 // Global request queue to prevent ANY parallel requests
 let requestQueue: Promise<any> = Promise.resolve();
-const MIN_REQUEST_INTERVAL = 500;
+const MIN_REQUEST_INTERVAL = 1000; // Increased to 1 second to respect Jikan API rate limits
 
 // Global request queue that ensures only one request at a time
 const queuedRequest = async <T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
@@ -33,7 +33,7 @@ const queuedRequest = async <T = any>(config: AxiosRequestConfig): Promise<Axios
     // Add request to queue
     requestQueue = requestQueue.then(async () => {
       try {
-        // Wait minimum interval before processing
+        // Wait minimum interval before processing (respect Jikan API rate limits)
         await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL));
 
         // Make the actual request
@@ -113,12 +113,18 @@ export const normalize = (anime: any) => {
     anime.images?.jpg?.image_url ||
     anime.image_url ||
     '';
+  // Prioritize English title, fallback to Japanese/other title
+  const englishTitle = anime.title_english || '';
+  const japaneseTitle = anime.title || anime.name || 'Unknown Title';
+  const displayTitle = englishTitle || japaneseTitle;
+
   return {
     ...anime,
     id: anime.mal_id?.toString() || anime.id?.toString(),
-    title: anime.title || anime.name || 'Unknown Title',
-    title_english: anime.title_english || '',
-    title_japanese: anime.title_japanese || '',
+    title: displayTitle,
+    title_english: englishTitle,
+    title_japanese: anime.title_japanese || japaneseTitle,
+    original_title: anime.title || anime.name || 'Unknown Title',
     poster: poster,
     image: poster,
     rating: anime.score || 0,
@@ -239,6 +245,7 @@ export const jikanAPI = {
   getStreamingServers: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
     return await streamingClient.get('/servers', { params: { episodeId, animeId, ep: episodeNumber } });
   },
+  getAnimeRelations: (id: string | number) => queuedRequest({ method: 'get', url: `/anime/${id}/relations` }),
   getCategory: (type: string, page: number = 1) => queuedRequest<JikanResponse<Anime[]>>({ method: 'get', url: `/top?type=${type}&page=${page}&limit=20` }),
 };
 
@@ -265,7 +272,7 @@ export const animehindiAPI = {
 
 export const hianimeAPI = {
   getSpotlight: async () => {
-    const res = await apiClient.request<any>({ method: 'get', url: '/seasons/upcoming?limit=10' });
+    const res = await queuedRequest<any>({ method: 'get', url: '/seasons/upcoming?limit=10' });
     const animeList = res.data?.data || [];
     return {
       data: {
@@ -281,7 +288,7 @@ export const hianimeAPI = {
     };
   },
   getTopAiring: async (page: number = 1) => {
-    const res = await apiClient.request<any>({ method: 'get', url: `/top/anime?filter=airing&page=${page}&limit=20` });
+    const res = await queuedRequest<any>({ method: 'get', url: `/top/anime?filter=airing&page=${page}&limit=20` });
     const animeList = res.data?.data || [];
     return {
       data: {

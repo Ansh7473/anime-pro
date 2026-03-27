@@ -15,13 +15,13 @@ const HlsPlayer = ({ src }: { src: string }) => {
     if (!video || !src) return;
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ 
-        maxBufferLength: 60, 
+      const hls = new Hls({
+        maxBufferLength: 60,
         enableWorker: true,
         xhrSetup: (xhr, url) => {
           // Bypass CORS restrictions for m3u8 playlists and ts segments
           if (url.includes('.m3u8') || url.includes('.ts')) {
-             xhr.open('GET', `https://corsproxy.io/?url=${encodeURIComponent(url)}`, true);
+            xhr.open('GET', `https://corsproxy.io/?url=${encodeURIComponent(url)}`, true);
           }
         }
       });
@@ -74,6 +74,7 @@ const Player = () => {
   const [animeInfo, setAnimeInfo] = useState<any>(null);
   const [providersUsed, setProvidersUsed] = useState<string>('');
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>([]);
 
   // Step 1: Load episode list and info
   useEffect(() => {
@@ -171,8 +172,19 @@ const Player = () => {
                 };
               });
               setRecommendations(normalized);
-            }).catch(() => {});
+            }).catch(() => { });
           }, 2000);
+
+          // Fetch seasons/relations
+          setTimeout(() => {
+            animeAPI.getAnimeRelations(animeId).then((seasonsRes: any) => {
+              const seasonsData = seasonsRes.data?.data || [];
+              setSeasons(seasonsData);
+            }).catch((err) => {
+              console.log('Could not fetch seasons:', err);
+              setSeasons([]);
+            });
+          }, 3000);
         }
       })
       .catch(err => {
@@ -235,7 +247,7 @@ const Player = () => {
         setError('Failed to load stream. Please try a different server or language.');
       })
       .finally(() => setLoadingStream(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episodeId, animeId, ep]); // NOTE: `category` intentionally omitted
 
   // Log to watch history when stream starts
@@ -248,7 +260,7 @@ const Player = () => {
         currentEp?.title || null,
         0,
         0
-      ).catch(() => {});
+      ).catch(() => { });
     }
   }, [animeInfo, ep, streamUrl, allEpisodes, addToWatchHistory]);
 
@@ -349,7 +361,7 @@ const Player = () => {
           >
             <ArrowLeft size={18} /> Back
           </button>
-          
+
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{
               fontSize: '1.25rem',
@@ -369,7 +381,7 @@ const Player = () => {
               </span>
               {currentEpisode?.title && (
                 <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 500 }}>
-                   • {currentEpisode.title}
+                  • {currentEpisode.title}
                 </span>
               )}
             </div>
@@ -408,7 +420,7 @@ const Player = () => {
 
       <div style={{ position: 'relative', zIndex: 1, padding: '2rem 4% 3rem' }}>
         <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap', maxWidth: '1700px', margin: '0 auto' }}>
-          
+
           <div style={{ flex: 1, minWidth: isMobile ? '100%' : '55%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div style={{
               background: 'rgba(15, 15, 15, 0.4)',
@@ -443,7 +455,7 @@ const Player = () => {
                   <span style={{ color: 'var(--net-red)', fontSize: '0.85rem', fontWeight: 600 }}>{providersUsed}</span>
                 </div>
               )}
-              
+
               <div style={{ marginBottom: '1.5rem' }}>
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Subtitles size={14} /> Language
@@ -475,7 +487,7 @@ const Player = () => {
                         onClick={() => handleSourceChange(srv.name, category)}
                         style={{ padding: '10px 20px', background: activeServer === srv.name ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)', color: 'white', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600, border: '1px solid ' + (activeServer === srv.name ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.05)'), cursor: 'pointer', transition: '0.2s' }}
                       >
-                         {srv.name} • {srv.quality || 'HD'}
+                        {srv.name} • {srv.quality || 'HD'}
                       </button>
                     ))}
                   </div>
@@ -537,50 +549,50 @@ const Player = () => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: Math.min(idx * 0.02, 0.5) }}
                     >
-                    <Link
-                      to={`/watch/${animeId}/${episode.number}`}
-                      state={{ episodeId: episode.id }}
-                      style={{
-                        display: 'flex',
-                        gap: '14px',
-                        padding: isMobile ? '10px' : '12px',
-                        background: isCurrent ? 'rgba(229, 9, 20, 0.15)' : 'rgba(255,255,255,0.02)',
-                        borderRadius: '20px',
-                        border: '1px solid ' + (isCurrent ? 'rgba(229, 9, 20, 0.3)' : 'rgba(255,255,255,0.05)'),
-                        textDecoration: 'none',
-                        transition: '0.3s'
-                      }}
-                    >
-                      {/* Thumbnail — smaller on mobile */}
-                      <div style={{
-                        width: isMobile ? '110px' : '180px',
-                        aspectRatio: '16/9',
-                        borderRadius: '10px',
-                        overflow: 'hidden',
-                        flexShrink: 0,
-                        position: 'relative',
-                        background: '#0a0a0a'
-                      }}>
-                        {episode.image ? (
-                          <img src={episode.image} alt={episode.number} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isCurrent ? 0.4 : 1 }} />
-                        ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 900, color: 'rgba(255,255,255,0.05)' }}>{episode.number}</div>
-                        )}
-                        <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.8)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, color: 'white' }}>EP {episode.number}</div>
-                        {isCurrent && (
-                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--net-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Play size={18} fill="white" style={{ marginLeft: '3px' }} />
+                      <Link
+                        to={`/watch/${animeId}/${episode.number}`}
+                        state={{ episodeId: episode.id }}
+                        style={{
+                          display: 'flex',
+                          gap: '14px',
+                          padding: isMobile ? '10px' : '12px',
+                          background: isCurrent ? 'rgba(229, 9, 20, 0.15)' : 'rgba(255,255,255,0.02)',
+                          borderRadius: '20px',
+                          border: '1px solid ' + (isCurrent ? 'rgba(229, 9, 20, 0.3)' : 'rgba(255,255,255,0.05)'),
+                          textDecoration: 'none',
+                          transition: '0.3s'
+                        }}
+                      >
+                        {/* Thumbnail — smaller on mobile */}
+                        <div style={{
+                          width: isMobile ? '110px' : '180px',
+                          aspectRatio: '16/9',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          position: 'relative',
+                          background: '#0a0a0a'
+                        }}>
+                          {episode.image ? (
+                            <img src={episode.image} alt={episode.number} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isCurrent ? 0.4 : 1 }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 900, color: 'rgba(255,255,255,0.05)' }}>{episode.number}</div>
+                          )}
+                          <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.8)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, color: 'white' }}>EP {episode.number}</div>
+                          {isCurrent && (
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--net-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Play size={18} fill="white" style={{ marginLeft: '3px' }} />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      <div style={{ flex: 1, padding: '4px 0' }}>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: isCurrent ? 'var(--net-red)' : 'white', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4 }}>{episode.title}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>{episode.aired || 'HD 1080p'}</div>
-                      </div>
-                    </Link>
+                        <div style={{ flex: 1, padding: '4px 0' }}>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: isCurrent ? 'var(--net-red)' : 'white', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4 }}>{episode.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>{episode.aired || 'HD 1080p'}</div>
+                        </div>
+                      </Link>
                     </motion.div>
                   );
                 })}
@@ -639,6 +651,68 @@ const Player = () => {
                       {/* Title */}
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4, textAlign: 'center' }}>
                         {rec.title}
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ===== SEASONS SECTION ===== */}
+        <AnimatePresence>
+          {seasons.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              style={{ marginTop: '3rem' }}
+            >
+              {/* Section header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1.75rem' }}>
+                <div style={{ width: '4px', height: '32px', background: 'linear-gradient(#3b82f6, #60a5fa)', borderRadius: '2px' }} />
+                <Info size={22} color="#3b82f6" />
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>Other Seasons & Related</h3>
+                <div style={{ marginLeft: 'auto', padding: '4px 14px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6' }}>
+                  {seasons.length} seasons
+                </div>
+              </div>
+
+              {/* Seasons Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                {seasons.map((season: any, i: number) => (
+                  <motion.div
+                    key={season.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: i * 0.05 }}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <Link key={season.id} to={`/anime/${season.id}`}
+                      style={{
+                        textDecoration: 'none',
+                        display: 'block',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '16px',
+                        padding: '1rem',
+                        transition: '0.3s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{ width: '60px', height: '85px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+                          {season.image && <img src={season.image} alt={season.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {season.title}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
+                            {season.type || 'TV'} • {season.relation || 'Related'}
+                          </div>
+                        </div>
                       </div>
                     </Link>
                   </motion.div>
