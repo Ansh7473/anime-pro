@@ -71,211 +71,132 @@ streamingRouter.get("/sources", async (c) => {
     `[Streaming] Fetching aggregated sources for ${mainTitle} Ep ${ep}...`,
   );
 
-  let aggregatedSources: any[] = [];
-  let aggregatedSubtitles: any[] = [];
-  let providersUsed: string[] = [];
-
   try {
 
-    // Run all provider requests in parallel to avoid timeouts
-    const providerPromises = [
-      // 1. Animelok sources
-      (async () => {
-        try {
-          const aniId = await getAnilistId(malId);
-          const idCandidates = [malId];
-          if (aniId && aniId !== malId) idCandidates.unshift(aniId);
+    // 1. Try Animelok first (Primary)
+    try {
+      const aniId = await getAnilistId(malId);
+      const idCandidates = [malId];
+      if (aniId && aniId !== malId) idCandidates.unshift(aniId);
 
-          const baseSlug = titles[0]
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "");
+      const baseSlug = titles[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
 
-          await fetchWithRetry(async () => {
-            for (const id of idCandidates) {
-              const candidateSlug = `${baseSlug}-${id}`;
-              const results = await getAnimelokSources(candidateSlug, ep);
-              if (results.sources && results.sources.length > 0) {
-                const sourcesWithProvider = results.sources.map((s: any) => ({
-                  ...s,
-                  provider: "Animelok",
-                }));
-                aggregatedSources.push(...sourcesWithProvider);
-                if (results.subtitles) aggregatedSubtitles.push(...results.subtitles);
-                providersUsed.push("Animelok");
-                return;
-              }
-            }
-            // Try Search Fallback if ID-slug failed
-            const lokResults = await searchAnimelok(titles[0]);
-            const lokMatch = lokResults.find((r: any) =>
-              titles.some((t) => {
-                const rt = (r.title || r.slug || "").toLowerCase();
-                const tt = t.toLowerCase();
-                return rt.includes(tt) || tt.includes(rt);
-              }),
-            );
-            if (lokMatch) {
-              const slug = lokMatch.slug || lokMatch.id;
-              const results = await getAnimelokSources(slug, ep);
-              if (results.sources && results.sources.length > 0) {
-                const sourcesWithProvider = results.sources.map((s: any) => ({
-                  ...s,
-                  provider: "Animelok (Search)",
-                }));
-                aggregatedSources.push(...sourcesWithProvider);
-                if (results.subtitles) aggregatedSubtitles.push(...results.subtitles);
-                providersUsed.push("Animelok (Search)");
-              }
-            }
-          });
-        } catch (e) {
-          console.log("[Streaming] Animelok failed after retries:", e);
+      const animelokResults = await fetchWithRetry(async () => {
+        for (const id of idCandidates) {
+          const candidateSlug = `${baseSlug}-${id}`;
+          const results = await getAnimelokSources(candidateSlug, ep);
+          if (results.sources && results.sources.length > 0) return results;
         }
-      })(),
-
-      // 2. DesiDubAnime sources
-      (async () => {
-        try {
-          await fetchWithRetry(async () => {
-            console.log("[Streaming] Searching DesiDubAnime for:", titles);
-            console.log("[Streaming] DesiDubAnime: Starting provider execution");
-
-            // Check for known anime mappings
-            for (const title of titles) {
-              const normalizedTitle = title.toLowerCase().trim();
-              let knownSlug = null;
-
-              if (normalizedTitle.includes('jujutsu kaisen')) {
-                knownSlug = 'jujutsu-kaisen-season-3';
-              } else if (normalizedTitle.includes('naruto')) {
-                knownSlug = 'naruto';
-              } else if (normalizedTitle === 'one piece' || normalizedTitle.includes('one piece')) {
-                knownSlug = 'one-piece';
-              } else if (normalizedTitle.includes('attack on titan')) {
-                knownSlug = 'attack-on-titan';
-              } else if (normalizedTitle.includes('demon slayer') || normalizedTitle.includes('kimetsu')) {
-                knownSlug = 'demon-slayer';
-              } else if (normalizedTitle.includes('my hero') || normalizedTitle.includes('boku no hero')) {
-                knownSlug = 'my-hero-academia';
-              } else if (normalizedTitle === 'death note') {
-                knownSlug = 'death-note';
-              } else if (normalizedTitle.includes('dragon ball')) {
-                knownSlug = 'dragon-ball';
-              } else if (normalizedTitle.includes('fairy tail')) {
-                knownSlug = 'fairy-tail';
-              } else if (normalizedTitle.includes('hunter x hunter')) {
-                knownSlug = 'hunter-x-hunter';
-              }
-
-              if (knownSlug) {
-                console.log("[Streaming] Trying DesiDubAnime slug:", knownSlug);
-
-                // Special case for Jujutsu Kaisen Season 3
-                if (knownSlug === "jujutsu-kaisen-season-3" && ep === 1) {
-                  console.log("[Streaming] DesiDubAnime: JJK S3 Ep 1 -> Ep 48");
-                  const results = await getDesiDubSources("jujutsu-kaisen-shimetsu-kaiyuu-zenpen-3rd-season-episode-48");
-                  if (results.length > 0) {
-                    console.log("[Streaming] DesiDubAnime: Found", results.length, "sources");
-                    const sourcesWithProvider = results.map((s) => ({
-                      ...s,
-                      provider: "DesiDubAnime",
-                    }));
-                    aggregatedSources.push(...sourcesWithProvider);
-                    providersUsed.push("DesiDubAnime");
-                    return;
-                  }
-                } else {
-                  // Try normal episode lookup
-                  const animeInfo = await getDesiDubInfo(knownSlug);
-                  if (animeInfo && animeInfo.episodes && animeInfo.episodes.length > 0) {
-                    const targetEpisode = animeInfo.episodes[0];
-                    if (targetEpisode && targetEpisode.slug) {
-                      const results = await getDesiDubSources(targetEpisode.slug);
-                      if (results.length > 0) {
-                        const sourcesWithProvider = results.map((s) => ({
-                          ...s,
-                          provider: "DesiDubAnime",
-                        }));
-                        aggregatedSources.push(...sourcesWithProvider);
-                        providersUsed.push("DesiDubAnime");
-                        return;
-                      }
-                    }
-                  } else {
-                    // Fallback: Try direct episode slug construction
-                    console.log("[Streaming] DesiDubAnime: No episodes found, trying direct slug");
-                    const directSlug = `${knownSlug}-episode-${ep}`;
-                    try {
-                      const results = await getDesiDubSources(directSlug);
-                      if (results.length > 0) {
-                        console.log("[Streaming] DesiDubAnime: Found", results.length, "sources via direct slug fallback");
-                        const sourcesWithProvider = results.map((s) => ({
-                          ...s,
-                          provider: "DesiDubAnime",
-                        }));
-                        aggregatedSources.push(...sourcesWithProvider);
-                        providersUsed.push("DesiDubAnime");
-                        return;
-                      }
-                    } catch (e) {
-                      console.log("[Streaming] DesiDubAnime direct slug failed:", e);
-                    }
-                  }
-                }
-              }
-            }
-          });
-        } catch (e) {
-          console.log("[Streaming] DesiDubAnime failed after retries:", e);
+        // Try Search Fallback
+        const lokResults = await searchAnimelok(titles[0]);
+        const lokMatch = lokResults.find((r: any) =>
+          titles.some((t) => {
+            const rt = (r.title || r.slug || "").toLowerCase();
+            const tt = t.toLowerCase();
+            return rt.includes(tt) || tt.includes(rt);
+          }),
+        );
+        if (lokMatch) {
+          const slug = lokMatch.slug || lokMatch.id;
+          return await getAnimelokSources(slug, ep);
         }
-        console.log("[Streaming] DesiDubAnime: No sources found for any title");
-      })(),
-
-      // 3. AnimeHindiDubbed sources
-      (async () => {
-        try {
-          await fetchWithRetry(async () => {
-            console.log("[Streaming] Searching AnimeHindiDubbed-WP for:", titles);
-            for (const title of titles) {
-              const ahdResults = await searchAnimeHindiDubbedWP(title);
-              console.log("[Streaming] AnimeHindiDubbed-WP results:", ahdResults.length);
-
-              if (ahdResults.length > 0) {
-                const match = ahdResults.find((r) =>
-                  r.title.rendered.toLowerCase().includes(title.toLowerCase()),
-                ) || ahdResults[0];
-
-                const sources = await getAnimeHindiDubbedAllSourcesWP(match.id, ep);
-                console.log("[Streaming] AnimeHindiDubbed-WP sources:", sources.length);
-
-                if (sources.length > 0) {
-                  const sourcesWithProvider = sources.map((s) => ({
-                    ...s,
-                    provider: "AnimeHindiDubbed-WP",
-                  }));
-                  aggregatedSources.push(...sourcesWithProvider);
-                  providersUsed.push("AnimeHindiDubbed-WP");
-                  return;
-                }
-              }
-            }
-          });
-        } catch (e) {
-          console.log("[Streaming] AnimeHindiDubbed-WP failed after retries:", e);
-        }
-      })(),
-    ];
-
-    // Wait for all providers to complete (with timeout)
-    await Promise.allSettled(providerPromises);
-
-    if (aggregatedSources.length > 0) {
-      return c.json({
-        provider: providersUsed.join(", "),
-        status: 200,
-        data: { sources: aggregatedSources, subtitles: aggregatedSubtitles },
+        return null;
       });
+
+      if (animelokResults && animelokResults.sources?.length > 0) {
+        console.log(`[Streaming] Found ${animelokResults.sources.length} sources from Animelok`);
+        return c.json({
+          provider: "Animelok",
+          status: 200,
+          data: { 
+            sources: animelokResults.sources.map((s: any) => ({ ...s, provider: "Animelok" })), 
+            subtitles: animelokResults.subtitles || [] 
+          },
+        });
+      }
+    } catch (e) {
+      console.log("[Streaming] Animelok pipeline failed:", e);
+    }
+
+    // 2. Try DesiDubAnime (Secondary)
+    try {
+      const desidubData = await fetchWithRetry(async () => {
+        for (const title of titles) {
+          const normalizedTitle = title.toLowerCase().trim();
+          let knownSlug = null;
+          if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
+          else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
+          else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
+          else if (normalizedTitle.includes('attack on titan')) knownSlug = 'attack-on-titan';
+          else if (normalizedTitle.includes('demon slayer')) knownSlug = 'demon-slayer';
+          else if (normalizedTitle.includes('my hero')) knownSlug = 'my-hero-academia';
+          else if (normalizedTitle === 'death note') knownSlug = 'death-note';
+          else if (normalizedTitle.includes('dragon ball')) knownSlug = 'dragon-ball';
+          else if (normalizedTitle.includes('fairy tail')) knownSlug = 'fairy-tail';
+          else if (normalizedTitle.includes('hunter x hunter')) knownSlug = 'hunter-x-hunter';
+
+          if (knownSlug) {
+            const desidubSources = await (async () => {
+              if (knownSlug === "jujutsu-kaisen-season-3" && ep === 1) {
+                const res = await getDesiDubSources("jujutsu-kaisen-shimetsu-kaiyuu-zenpen-3rd-season-episode-48");
+                if (res && res.length > 0) return res;
+              }
+              const info = await getDesiDubInfo(knownSlug);
+              const episodes = info?.episodes;
+              if (episodes && Array.isArray(episodes) && episodes.length > 0) {
+                const epData = episodes.find((e: any) => parseInt(e.number) === ep) || episodes[0];
+                if (epData?.slug) {
+                  const res = await getDesiDubSources(epData.slug);
+                  if (res && res.length > 0) return res;
+                }
+              }
+              const directRes = await getDesiDubSources(`${knownSlug}-episode-${ep}`);
+              if (directRes && directRes.length > 0) return directRes;
+              return null;
+            })();
+            if (desidubSources) return desidubSources;
+          }
+        }
+        return null;
+      });
+
+      if (desidubData && desidubData.length > 0) {
+        return c.json({
+          provider: "DesiDubAnime",
+          status: 200,
+          data: { sources: desidubData.map((s: any) => ({ ...s, provider: "DesiDubAnime" })), subtitles: [] },
+        });
+      }
+    } catch (e) {
+      console.log("[Streaming] DesiDubAnime failed:", e);
+    }
+
+    // 3. Try AnimeHindiDubbed-WP (Tertiary)
+    try {
+      const ahdData = await fetchWithRetry(async () => {
+        for (const title of titles) {
+          const results = await searchAnimeHindiDubbedWP(title);
+          if (results.length > 0) {
+            const match = results.find(r => r.title.rendered.toLowerCase().includes(title.toLowerCase())) || results[0];
+            const sources = await getAnimeHindiDubbedAllSourcesWP(match.id, ep);
+            if (sources.length > 0) return sources;
+          }
+        }
+        return null;
+      });
+
+      if (ahdData && ahdData.length > 0) {
+        return c.json({
+          provider: "AnimeHindiDubbed-WP",
+          status: 200,
+          data: { sources: ahdData.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })), subtitles: [] },
+        });
+      }
+    } catch (e) {
+      console.log("[Streaming] AnimeHindiDubbed-WP failed:", e);
     }
   } catch (e: any) {
     console.error("[Streaming Router] Error:", e.message);
