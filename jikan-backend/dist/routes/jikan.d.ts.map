@@ -1,1 +1,1 @@
-{"version":3,"file":"jikan.d.ts","sourceRoot":"","sources":["../../src/routes/jikan.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAC;AA6C5B,QAAA,MAAM,MAAM,4EAAa,CAAC;AAub1B,eAAe,MAAM,CAAC"}
+{"version":3,"file":"jikan.d.ts","sourceRoot":"","sources":["../../src/routes/jikan.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAC;AA8C5B,QAAA,MAAM,MAAM,4EAAa,CAAC;AAoiB1B,eAAe,MAAM,CAAC"}

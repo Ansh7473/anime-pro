@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { retryWithBackoff } from "../lib/rateLimiter.js";
 // Simple in-memory rate limiting
 const requestTimestamps = [];
 const RATE_LIMIT_WINDOW = 1000; // 1 second
@@ -65,12 +66,19 @@ router.get("/anime/:id", jikanRateLimit, async (c) => {
         throw new HTTPException(400, { message: "Invalid anime ID" });
     }
     try {
-        const response = await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);
-        if (!response.ok) {
-            throw new HTTPException(response.status, {
-                message: `Jikan API error: ${response.statusText}`,
-            });
-        }
+        const response = await retryWithBackoff(async () => {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);
+            if (!res.ok) {
+                // Special handling for rate limit errors (429)
+                if (res.status === 429) {
+                    console.log(`[Jikan API] Rate limit hit for anime/${id}/full, will retry`);
+                }
+                throw new HTTPException(res.status, {
+                    message: `Jikan API error: ${res.statusText}`,
+                });
+            }
+            return res;
+        }, 3, 1000); // 3 retries, starting with 1 second delay
         const data = await response.json();
         return c.json(data);
     }
@@ -90,12 +98,18 @@ router.get("/anime/:id/basic", jikanRateLimit, async (c) => {
         throw new HTTPException(400, { message: "Invalid anime ID" });
     }
     try {
-        const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
-        if (!response.ok) {
-            throw new HTTPException(response.status, {
-                message: `Jikan API error: ${response.statusText}`,
-            });
-        }
+        const response = await retryWithBackoff(async () => {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
+            if (!res.ok) {
+                if (res.status === 429) {
+                    console.log(`[Jikan API] Rate limit hit for anime/${id}, will retry`);
+                }
+                throw new HTTPException(res.status, {
+                    message: `Jikan API error: ${res.statusText}`,
+                });
+            }
+            return res;
+        }, 3, 1000);
         const data = await response.json();
         return c.json(data);
     }
@@ -193,6 +207,37 @@ router.get("/top", jikanRateLimit, async (c) => {
         });
     }
 });
+// Get top anime (Jikan v4 compatible endpoint with filter support)
+router.get("/top/anime", jikanRateLimit, async (c) => {
+    const type = c.req.query("type") || "tv";
+    const filter = c.req.query("filter");
+    const page = c.req.query("page") || "1";
+    const limit = c.req.query("limit") || "25";
+    try {
+        const url = new URL("https://api.jikan.moe/v4/top/anime");
+        url.searchParams.append("type", type);
+        if (filter)
+            url.searchParams.append("filter", filter);
+        url.searchParams.append("page", page);
+        url.searchParams.append("limit", limit);
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+            throw new HTTPException(response.status, {
+                message: `Jikan API error: ${response.statusText}`,
+            });
+        }
+        const data = await response.json();
+        return c.json(data);
+    }
+    catch (error) {
+        if (error instanceof HTTPException) {
+            throw error;
+        }
+        throw new HTTPException(500, {
+            message: `Failed to fetch top anime: ${error.message}`,
+        });
+    }
+});
 // Get anime recommendations
 router.get("/anime/:id/recommendations", jikanRateLimit, async (c) => {
     const id = c.req.param("id");
@@ -251,14 +296,20 @@ router.get("/anime/:id/episodes", jikanRateLimit, async (c) => {
         throw new HTTPException(400, { message: "Invalid anime ID" });
     }
     try {
-        const url = new URL(`https://api.jikan.moe/v4/anime/${id}/episodes`);
-        url.searchParams.append("page", page);
-        const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new HTTPException(response.status, {
-                message: `Jikan API error: ${response.statusText}`,
-            });
-        }
+        const response = await retryWithBackoff(async () => {
+            const url = new URL(`https://api.jikan.moe/v4/anime/${id}/episodes`);
+            url.searchParams.append("page", page);
+            const res = await fetch(url.toString());
+            if (!res.ok) {
+                if (res.status === 429) {
+                    console.log(`[Jikan API] Rate limit hit for anime/${id}/episodes page ${page}, will retry`);
+                }
+                throw new HTTPException(res.status, {
+                    message: `Jikan API error: ${res.statusText}`,
+                });
+            }
+            return res;
+        }, 3, 1000);
         const data = await response.json();
         return c.json(data);
     }
@@ -400,6 +451,53 @@ router.get("/seasons", jikanRateLimit, async (c) => {
         }
         throw new HTTPException(500, {
             message: `Failed to fetch seasons list: ${error.message}`,
+        });
+    }
+});
+// Get anime relations (other seasons, sequels, prequels, etc.)
+router.get("/anime/:id/relations", jikanRateLimit, async (c) => {
+    const id = c.req.param("id");
+    // Validate ID
+    if (!id || isNaN(parseInt(id))) {
+        throw new HTTPException(400, { message: "Invalid anime ID" });
+    }
+    try {
+        const response = await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);
+        if (!response.ok) {
+            throw new HTTPException(response.status, {
+                message: `Jikan API error: ${response.statusText}`,
+            });
+        }
+        const data = await response.json();
+        // Extract relations from the full anime data
+        const relations = data.data?.relations || [];
+        // Filter for season-related relations (sequel, prequel, alternative version, etc.)
+        const seasonRelations = relations.filter((rel) => {
+            const relationLower = rel.relation?.toLowerCase();
+            return ['sequel', 'prequel', 'alternative_version', 'side_story', 'parent_story', 'summary', 'spin-off', 'adaptation'].includes(relationLower);
+        });
+        // Map to a simpler format for the frontend
+        const mappedRelations = seasonRelations.flatMap((rel) => rel.entry.map((entry) => ({
+            id: entry.mal_id?.toString(),
+            title: entry.name,
+            type: entry.type,
+            relation: rel.relation,
+            poster: entry.images?.jpg?.image_url || ''
+        })));
+        return c.json({
+            data: mappedRelations,
+            meta: {
+                count: mappedRelations.length,
+                anime_id: id
+            }
+        });
+    }
+    catch (error) {
+        if (error instanceof HTTPException) {
+            throw error;
+        }
+        throw new HTTPException(500, {
+            message: `Failed to fetch anime relations: ${error.message}`,
         });
     }
 });

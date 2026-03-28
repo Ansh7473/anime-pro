@@ -115,13 +115,18 @@ router.get("/anime/:id/basic", jikanRateLimit, async (c) => {
   }
 
   try {
-    const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
-
-    if (!response.ok) {
-      throw new HTTPException(response.status as any, {
-        message: `Jikan API error: ${response.statusText}`,
-      });
-    }
+    const response = await retryWithBackoff(async () => {
+      const res = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
+      if (!res.ok) {
+        if (res.status === 429) {
+          console.log(`[Jikan API] Rate limit hit for anime/${id}, will retry`);
+        }
+        throw new HTTPException(res.status as any, {
+          message: `Jikan API error: ${res.statusText}`,
+        });
+      }
+      return res;
+    }, 3, 1000);
 
     const data = await response.json();
     return c.json(data);
@@ -339,16 +344,21 @@ router.get("/anime/:id/episodes", jikanRateLimit, async (c) => {
   }
 
   try {
-    const url = new URL(`https://api.jikan.moe/v4/anime/${id}/episodes`);
-    url.searchParams.append("page", page);
+    const response = await retryWithBackoff(async () => {
+      const url = new URL(`https://api.jikan.moe/v4/anime/${id}/episodes`);
+      url.searchParams.append("page", page);
+      const res = await fetch(url.toString());
 
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      throw new HTTPException(response.status as any, {
-        message: `Jikan API error: ${response.statusText}`,
-      });
-    }
+      if (!res.ok) {
+        if (res.status === 429) {
+          console.log(`[Jikan API] Rate limit hit for anime/${id}/episodes page ${page}, will retry`);
+        }
+        throw new HTTPException(res.status as any, {
+          message: `Jikan API error: ${res.statusText}`,
+        });
+      }
+      return res;
+    }, 3, 1000);
 
     const data = await response.json();
     return c.json(data);
