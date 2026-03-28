@@ -66,9 +66,6 @@ streamingRouter.get("/sources", async (c) => {
   let providersUsed: string[] = [];
 
   try {
-    let aggregatedSources: any[] = [];
-    let aggregatedSubtitles: any[] = [];
-    let providersUsed: string[] = [];
 
     // Run all provider requests in parallel to avoid timeouts
     const providerPromises = [
