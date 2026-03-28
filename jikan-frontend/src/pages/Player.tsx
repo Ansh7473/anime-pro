@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { ArrowLeft, Play, Subtitles, Star, Heart, Share2, Info, TrendingUp, Flame } from 'lucide-react';
 import Hls from 'hls.js';
 import { animeAPI, normalize } from '../api/client';
@@ -61,6 +63,35 @@ const Player = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Handle mobile status bar
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const hideBar = async () => {
+        try {
+          // Hide status bar for immersive feel during playback
+          await StatusBar.hide();
+        } catch (e) {
+          console.warn('Native mobile status bar hide failed:', e);
+        }
+      };
+
+      const showBar = async () => {
+        try {
+          await StatusBar.show();
+          await StatusBar.setStyle({ style: Style.Dark });
+        } catch (e) {
+          console.warn('Native mobile status bar show failed:', e);
+        }
+      };
+
+      hideBar();
+      return () => { showBar(); };
+    }
+  }, []);
+
+  const lastEpisodesReqId = useRef<string>("");
+  const lastRequestRef = useRef<string>('');
+
   const [allEpisodes, setAllEpisodes] = useState<any[]>([]);
   const [episodeId, setEpisodeId] = useState<string>('');
   const [category, setCategory] = useState<Category>('dub');
@@ -91,16 +122,14 @@ const Player = () => {
               let episodes = epRes.data?.data || [];
               const totalPages = epRes.data?.pagination?.last_visible_page || 1;
 
-              // Fetch ALL pages so we support unlimited-length series (e.g. One Piece, Naruto)
+              // Fetch ALL pages sequentially to avoid Jikan 429 (Rate Limit: 3 req/sec)
               if (totalPages > 1) {
-                const pageRequests = [];
                 for (let page = 2; page <= totalPages; page++) {
-                  pageRequests.push(animeAPI.getEpisodes(animeId, page));
-                }
-                const results = await Promise.all(pageRequests);
-                results.forEach(r => {
+                  // Small delay to respect rate limits
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  const r = await animeAPI.getEpisodes(animeId, page);
                   if (r.data?.data) episodes = [...episodes, ...r.data.data];
-                });
+                }
               }
 
               const normalizedEps = episodes.map((ep: any, index: number) => ({
@@ -110,6 +139,10 @@ const Player = () => {
                 image: ep.images?.jpg?.image_url || '',
                 aired: ep.aired || '',
               }));
+
+              const requestId = `${animeId}`;
+              if (lastEpisodesReqId.current === requestId) return;
+              lastEpisodesReqId.current = requestId;
 
               setAllEpisodes(normalizedEps);
               setLoadingEpisodes(false);
@@ -125,8 +158,14 @@ const Player = () => {
                       const epNumStr = String(m.number);
                       const existing = epMap.get(epNumStr);
                       let imageUrl = m.image || m.img || '';
-                      if (imageUrl.startsWith('https://img.animetsu.cc/https://')) {
-                        imageUrl = imageUrl.replace('https://img.animetsu.cc/', '');
+                      if (imageUrl.includes('proxy.animetsu.cc') || imageUrl.includes('img.animetsu.cc')) {
+                         // If it's a double URL like proxy.animetsu.cc/https://...
+                         if (imageUrl.includes('https://', 8)) {
+                           imageUrl = imageUrl.substring(imageUrl.indexOf('https://', 8));
+                         } else {
+                           // If it's just a broken proxy, use a placeholder or the anime poster as fallback
+                           imageUrl = ''; 
+                         }
                       }
                       if (existing) {
                         epMap.set(epNumStr, {
@@ -202,6 +241,12 @@ const Player = () => {
 
   useEffect(() => {
     if (!episodeId || !animeId) return;
+    
+    // Guard: Prevent redundant requests for the same episode
+    const requestKey = `${animeId}-${ep}-${episodeId}`;
+    if (lastRequestRef.current === requestKey) return;
+    lastRequestRef.current = requestKey;
+
     setLoadingStream(true);
     setError('');
     // Reset sources so the new episode starts fresh
@@ -442,7 +487,11 @@ const Player = () => {
                   </div>
                 ) : streamUrl ? (
                   isEmbed ? (
-                    <iframe src={streamUrl} style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen />
+                    <iframe 
+                      src={streamUrl} 
+                      style={{ width: '100%', height: '100%', border: 'none' }} 
+                      allowFullScreen 
+                    />
                   ) : <HlsPlayer key={streamUrl} src={streamUrl} />
                 ) : null}
               </div>
