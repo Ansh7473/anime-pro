@@ -292,92 +292,93 @@ streamingRouter.get("/sources", async (c) => {
   const allAggregatedSubtitles: any[] = [];
   const successfulProviders: string[] = [];
 
-  // Re-use provider logic functions (internal calls)
-  const results = await Promise.allSettled([
-    (async () => {
-      // Internal fetch logic for Animelok
+  // Sequential Provider Execution (1s staggered delay)
+  const providerFns = [
+    async () => {
+      // 1. Animelok sources (sequential logic)
       try {
+        console.log("[Streaming] Sequential Provider: Attempting Animelok...");
         const aniId = await getAnilistId(malId);
         const idCandidates = [malId];
         if (aniId && aniId !== malId) idCandidates.unshift(aniId);
         const baseSlug = titles[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        const res = await fetchWithRetry(async () => {
-          for (const id of idCandidates) {
-            const results = await getAnimelokSources(`${baseSlug}-${id}`, ep);
-            if (results && results.sources && results.sources.length > 0) return results;
+
+        for (const id of idCandidates) {
+          const results = await getAnimelokSources(`${baseSlug}-${id}`, ep);
+          if (results && results.sources && results.sources.length > 0) {
+            successfulProviders.push("Animelok");
+            allAggregatedSources.push(...results.sources.map((s: any) => ({ ...s, provider: "Animelok" })));
+            if (results.subtitles) allAggregatedSubtitles.push(...results.subtitles);
+            return;
           }
-          const search = await searchAnimelok(titles[0]);
-          const match = search.find((r: any) => titles.some((t) => (r.title || r.slug || "").toLowerCase().includes(t.toLowerCase())));
-          if (match) return await getAnimelokSources(match.slug || match.id, ep);
-          return null;
-        });
-        if (res && res.sources && res.sources.length > 0) {
-          successfulProviders.push("Animelok");
-          return { sources: res.sources.map((s: any) => ({ ...s, provider: "Animelok" })), subtitles: res.subtitles || [] };
         }
-      } catch (e) { console.log("Animelok fetch failed", e); }
-      return null;
-    })(),
-    (async () => {
-      // Internal fetch logic for DesiDub
+        const search = await searchAnimelok(titles[0]);
+        const match = search.find((r: any) => titles.some((t) => (r.title || r.slug || "").toLowerCase().includes(t.toLowerCase())));
+        if (match) {
+          const res = await getAnimelokSources(match.slug || match.id, ep);
+          if (res && res.sources && res.sources.length > 0) {
+            successfulProviders.push("Animelok");
+            allAggregatedSources.push(...res.sources.map((s: any) => ({ ...s, provider: "Animelok (Search)" })));
+            if (res.subtitles) allAggregatedSubtitles.push(...res.subtitles);
+          }
+        }
+      } catch (e) { console.log("[Streaming] Animelok sequential fetch failed", e); }
+    },
+    async () => {
+      // 2. DesiDubAnime sources (sequential logic)
       try {
-        const res = await fetchWithRetry(async () => {
-          for (const title of titles) {
-            const normalizedTitle = title.toLowerCase().trim();
-            let knownSlug = null;
-            if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
-            else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
-            else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
-            if (knownSlug) {
-              const info = await getDesiDubInfo(knownSlug);
-              const epData = info?.episodes?.find((e: any) => parseInt(e.number) === ep) || info?.episodes?.[0];
-              if (epData) {
-                const s = await getDesiDubSources(epData.slug || `${knownSlug}-episode-${ep}`);
-                if (s && s.length > 0) return s;
+        console.log("[Streaming] Sequential Provider: Attempting DesiDubAnime (1s delay)...");
+        for (const title of titles) {
+          const normalizedTitle = title.toLowerCase().trim();
+          let knownSlug = null;
+          if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
+          else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
+          else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
+          
+          if (knownSlug) {
+            const info = await getDesiDubInfo(knownSlug);
+            const epData = info?.episodes?.find((e: any) => parseInt(e.number) === ep) || info?.episodes?.[0];
+            if (epData) {
+              const s = await getDesiDubSources(epData.slug || `${knownSlug}-episode-${ep}`);
+              if (s && s.length > 0) {
+                successfulProviders.push("DesiDubAnime");
+                allAggregatedSources.push(...s.map((it: any) => ({ ...it, provider: "DesiDubAnime" })));
+                return;
               }
             }
           }
-          return null;
-        });
-        if (res && res.length > 0) {
-          successfulProviders.push("DesiDubAnime");
-          return { sources: res.map((s: any) => ({ ...s, provider: "DesiDubAnime" })), subtitles: [] };
         }
-      } catch (e) { console.log("DesiDub fetch failed", e); }
-      return null;
-    })(),
-    (async () => {
-      // Internal fetch logic for AHD
+      } catch (e) { console.log("[Streaming] DesiDub sequential fetch failed", e); }
+    },
+    async () => {
+      // 3. AnimeHindiDubbed-WP sources (sequential logic)
       try {
-        const res = await fetchWithRetry(async () => {
-          for (const title of titles) {
-            const search = await searchAnimeHindiDubbedWP(title);
-            if (search && search.length > 0) {
-              const s = await getAnimeHindiDubbedAllSourcesWP(search[0].id, ep);
-              if (s && s.length > 0) return s;
+        console.log("[Streaming] Sequential Provider: Attempting AHD (1s delay)...");
+        for (const title of titles) {
+          const search = await searchAnimeHindiDubbedWP(title);
+          if (search && search.length > 0) {
+            const s = await getAnimeHindiDubbedAllSourcesWP(search[0].id, ep);
+            if (s && s.length > 0) {
+              successfulProviders.push("AnimeHindiDubbed-WP");
+              allAggregatedSources.push(...s.map((it: any) => ({ ...it, provider: "AnimeHindiDubbed-WP" })));
+              return;
             }
           }
-          return null;
-        });
-        if (res && res.length > 0) {
-          successfulProviders.push("AnimeHindiDubbed-WP");
-          return { sources: res.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })), subtitles: [] };
         }
-      } catch (e) { console.log("AHD fetch failed", e); }
-      return null;
-    })()
-  ]);
-
-  results.forEach(result => {
-    if (result.status === "fulfilled" && result.value) {
-      allAggregatedSources.push(...result.value.sources);
-      allAggregatedSubtitles.push(...result.value.subtitles);
+      } catch (e) { console.log("[Streaming] AHD sequential fetch failed", e); }
     }
-  });
+  ];
+
+  for (let i = 0; i < providerFns.length; i++) {
+    await providerFns[i]();
+    if (i < providerFns.length - 1) {
+      await new Promise(r => setTimeout(r, 1000)); // 1s staggered delay
+    }
+  }
 
   if (allAggregatedSources.length > 0) {
     return c.json({
-      provider: "Aggregated",
+      provider: successfulProviders.join(", "),
       status: 200,
       data: { sources: allAggregatedSources, subtitles: allAggregatedSubtitles },
     });
@@ -393,100 +394,76 @@ streamingRouter.get("/episode-metadata", async (c) => {
   const titles = await getAnimeTitles(malId);
   if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
 
-  // Try all providers in parallel for episode metadata
-  const metadataPromises = [
-    // 1. Animelok metadata
-    (async () => {
+  let metadataResult: any = null;
+
+  // Sequential Metadata Execution (1s staggered delay)
+  const metadataFns = [
+    async () => {
+      // 1. Animelok metadata
       try {
+        console.log("[Metadata] Sequential Provider: Attempting Animelok...");
         const aniId = await getAnilistId(malId);
         const idCandidates = [malId];
         if (aniId && aniId !== malId) idCandidates.unshift(aniId);
-
-        const baseSlug = titles[0]
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "");
+        const baseSlug = titles[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
         for (const id of idCandidates) {
           const candidateSlug = `${baseSlug}-${id}`;
           const episodes = await getAnimelokMetadata(candidateSlug);
           if (episodes.length > 0) {
-            return {
-              provider: "Animelok",
-              episodes: episodes
-            };
+            metadataResult = { provider: "Animelok", episodes: episodes };
+            return;
           }
         }
-      } catch (e) {
-        console.log("[Metadata] Animelok failed:", e);
-      }
-      return null;
-    })(),
-
-    // 2. DesiDubAnime metadata
-    (async () => {
+      } catch (e) { console.log("[Metadata] Animelok failed", e); }
+    },
+    async () => {
+      // 2. DesiDubAnime metadata
+      if (metadataResult) return; 
       try {
-        console.log("[Metadata] Checking DesiDubAnime for:", titles);
-
-        // Check for known anime mappings
+        console.log("[Metadata] Sequential Provider: Attempting DesiDubAnime (1s delay)...");
         for (const title of titles) {
           const normalizedTitle = title.toLowerCase().trim();
           let knownSlug = null;
-
-          if (normalizedTitle.includes('jujutsu kaisen')) {
-            knownSlug = 'jujutsu-kaisen-season-3';
-          } else if (normalizedTitle.includes('naruto')) {
-            knownSlug = 'naruto';
-          } else if (normalizedTitle.includes('one piece')) {
-            knownSlug = 'one-piece';
-          } else if (normalizedTitle.includes('attack on titan')) {
-            knownSlug = 'attack-on-titan';
-          } else if (normalizedTitle.includes('demon slayer')) {
-            knownSlug = 'demon-slayer';
-          } else if (normalizedTitle.includes('my hero academia')) {
-            knownSlug = 'my-hero-academia';
-          } else if (normalizedTitle === 'death note') {
-            knownSlug = 'death-note';
-          }
-
+          if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
+          else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
+          else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
+          
           if (knownSlug) {
-            console.log("[Metadata] Trying DesiDubAnime slug:", knownSlug);
             const animeInfo = await getDesiDubInfo(knownSlug);
             if (animeInfo && animeInfo.episodes && animeInfo.episodes.length > 0) {
-              const episodes = animeInfo.episodes.map((ep: any) => ({
-                id: ep.slug || `episode-${ep.number}`,
-                number: parseInt(ep.number) || 1,
-                title: ep.title || `Episode ${ep.number}`,
-                image: ep.image || '',
-                aired: ep.date || '',
-              }));
-
-              return {
+              metadataResult = {
                 provider: "DesiDubAnime",
-                episodes: episodes
+                episodes: animeInfo.episodes.map((ep: any) => ({
+                  id: ep.slug || `episode-${ep.number}`,
+                  number: parseInt(ep.number) || 1,
+                  title: ep.title || `Episode ${ep.number}`,
+                  image: ep.image || '',
+                  aired: ep.date || '',
+                }))
               };
+              return;
             }
           }
         }
-      } catch (e) {
-        console.log("[Metadata] DesiDubAnime failed:", e);
-      }
-      return null;
-    })(),
+      } catch (e) { console.log("[Metadata] DesiDubAnime failed", e); }
+    }
   ];
 
-  // Wait for all metadata providers to complete
-  const results = await Promise.allSettled(metadataPromises);
-
-  // Return the first successful result
-  for (const result of results) {
-    if (result.status === 'fulfilled' && result.value) {
-      return c.json({
-        provider: result.value.provider,
-        status: 200,
-        data: { episodes: result.value.episodes },
-      });
+  for (let i = 0; i < metadataFns.length; i++) {
+    await metadataFns[i]();
+    if (metadataResult) break;
+    if (i < metadataFns.length - 1) {
+      await new Promise(r => setTimeout(r, 1000));
     }
+  }
+
+  if (metadataResult) {
+    return c.json({
+      provider: metadataResult.provider,
+      status: 200,
+      data: { episodes: metadataResult.episodes },
+    });
   }
 
   return c.json(
