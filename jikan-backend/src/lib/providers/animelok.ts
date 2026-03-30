@@ -41,6 +41,7 @@ const getNextScraperKey = () => {
 };
 
 const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL || "";
+console.info(`[Animelok] FLARESOLVERR_URL loaded: "${FLARESOLVERR_URL}" (length: ${FLARESOLVERR_URL.length})`);
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   // Track 1: Direct fetch (works on localhost, fails on cloud due to Cloudflare)
