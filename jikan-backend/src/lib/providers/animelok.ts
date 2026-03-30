@@ -40,8 +40,10 @@ const getNextScraperKey = () => {
   return key;
 };
 
+const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL || "";
+
 const fetchWithProxy = async (url: string, options: any = {}) => {
-  // Track 1: Direct fetch (works on localhost, blocked on cloud servers by Cloudflare)
+  // Track 1: Direct fetch (works on localhost, fails on cloud due to Cloudflare)
   const directTrack = async () => {
     const res = await fetchWithTimeout(url, options, 3000);
     if (res.status === 403 || res.status === 503) {
@@ -54,39 +56,59 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     return res;
   };
 
-  // Track 2a: ScraperAPI render=false (fast, residential IP rotation, no JS engine overhead)
-  const scraperFastTrack = async () => {
-    await new Promise(r => setTimeout(r, 300));
-    const key = getNextScraperKey();
-    if (!key) throw new Error("No ScraperAPI key");
-    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=false`;
-    const res = await fetchWithTimeout(scraperUrl, { method: options.method || "GET", body: options.body }, 10000);
-    if (!res.ok) throw new Error(`ScraperAPI(fast) failed: ${res.status}`);
-    const body = await res.clone().text().catch(() => "");
-    if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
-      throw new Error("ScraperAPI(fast) hit CF challenge");
+  // Track 2: FlareSolverr — real Chromium, beats Cloudflare Enterprise
+  const flaresolverrTrack = async () => {
+    await new Promise(r => setTimeout(r, 200));
+    if (!FLARESOLVERR_URL) throw new Error("No FlareSolverr URL set");
+    try {
+      const fsRes = await fetchWithTimeout(
+        `${FLARESOLVERR_URL}/v1`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cmd: "request.get", url, maxTimeout: 30000 }),
+        },
+        35000
+      );
+      if (!fsRes.ok) throw new Error(`FlareSolverr HTTP ${fsRes.status}`);
+      const data = (await fsRes.json()) as any;
+      if (data.status !== "ok" || !data.solution?.response) {
+        throw new Error(`FlareSolverr: ${data.status} - ${data.message}`);
+      }
+      console.info(`[Animelok] FlareSolverr success for ${url}`);
+      return new Response(data.solution.response, {
+        status: data.solution.status || 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      console.error(`[Animelok FlareSolverr] ${url}: ${err.message}`);
+      throw err;
     }
-    console.info(`[Animelok] ScraperAPI(fast) success for ${url}`);
-    return res;
   };
 
-  // Track 2b: ScraperAPI render=true (slow, full headless browser solves CF IUAM)
-  const scraperRenderTrack = async () => {
-    await new Promise(r => setTimeout(r, 500));
+  // Track 3: ScraperAPI render=false (cheap fallback, sometimes works)
+  const scraperFastTrack = async () => {
+    await new Promise(r => setTimeout(r, 400));
     const key = getNextScraperKey();
     if (!key) throw new Error("No ScraperAPI key");
-    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
-    const res = await fetchWithTimeout(scraperUrl, { method: "GET" }, 25000);
-    if (!res.ok) {
-      console.warn(`[Animelok ScraperAPI(render)] ${res.status} for ${url}`);
-      throw new Error(`ScraperAPI(render) failed: ${res.status}`);
+    try {
+      const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=false`;
+      const res = await fetchWithTimeout(scraperUrl, { method: options.method || "GET", body: options.body }, 10000);
+      if (!res.ok) throw new Error(`ScraperAPI(fast) ${res.status}`);
+      const body = await res.clone().text().catch(() => "");
+      if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
+        throw new Error("ScraperAPI(fast) hit CF challenge");
+      }
+      console.info(`[Animelok] ScraperAPI(fast) success for ${url}`);
+      return res;
+    } catch (err: any) {
+      console.error(`[Animelok ScraperAPI] ${url}: ${err.message}`);
+      throw err;
     }
-    console.info(`[Animelok] ScraperAPI(render) success for ${url}`);
-    return res;
   };
 
   try {
-    const result = await Promise.any([directTrack(), scraperFastTrack(), scraperRenderTrack()]);
+    const result = await Promise.any([directTrack(), flaresolverrTrack(), scraperFastTrack()]);
     console.info(`[Animelok] Success for ${url}`);
     return result;
   } catch (e: any) {
@@ -94,6 +116,7 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     throw new Error(`Animelok blocked by Cloudflare: ${e.message}`);
   }
 };
+
 
 export async function getAnilistId(malId: string): Promise<string | null> {
   if (anilistCache.has(malId)) return anilistCache.get(malId)!;
