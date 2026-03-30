@@ -59,8 +59,8 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   // Track 2: FlareSolverr — real Chromium, beats Cloudflare Enterprise
   const flaresolverrTrack = async () => {
     await new Promise(r => setTimeout(r, 200));
-    if (!FLARESOLVERR_URL) throw new Error("No FlareSolverr URL set");
     try {
+      if (!FLARESOLVERR_URL) throw new Error("No FlareSolverr URL set — add FLARESOLVERR_URL env var");
       const fsRes = await fetchWithTimeout(
         `${FLARESOLVERR_URL}/v1`,
         {
