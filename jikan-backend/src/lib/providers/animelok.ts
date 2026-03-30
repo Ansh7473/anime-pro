@@ -54,27 +54,39 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     return res;
   };
 
-  // Track 2: ScraperAPI - designed specifically to bypass Cloudflare
-  const scraperTrack = async () => {
+  // Track 2a: ScraperAPI render=false (fast, residential IP rotation, no JS engine overhead)
+  const scraperFastTrack = async () => {
     await new Promise(r => setTimeout(r, 300));
     const key = getNextScraperKey();
-    if (!key) throw new Error("No ScraperAPI key configured");
-
-    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
-    const scraperOptions: any = { method: options.method || "GET" };
-    if (options.body) scraperOptions.body = options.body;
-
-    const res = await fetchWithTimeout(scraperUrl, scraperOptions, 25000);
-    if (!res.ok) {
-      console.warn(`[Animelok ScraperAPI] ${res.status} for ${url}`);
-      throw new Error(`ScraperAPI failed: ${res.status}`);
+    if (!key) throw new Error("No ScraperAPI key");
+    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=false`;
+    const res = await fetchWithTimeout(scraperUrl, { method: options.method || "GET", body: options.body }, 10000);
+    if (!res.ok) throw new Error(`ScraperAPI(fast) failed: ${res.status}`);
+    const body = await res.clone().text().catch(() => "");
+    if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
+      throw new Error("ScraperAPI(fast) hit CF challenge");
     }
-    console.info(`[Animelok] ScraperAPI success for ${url}`);
+    console.info(`[Animelok] ScraperAPI(fast) success for ${url}`);
+    return res;
+  };
+
+  // Track 2b: ScraperAPI render=true (slow, full headless browser solves CF IUAM)
+  const scraperRenderTrack = async () => {
+    await new Promise(r => setTimeout(r, 500));
+    const key = getNextScraperKey();
+    if (!key) throw new Error("No ScraperAPI key");
+    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
+    const res = await fetchWithTimeout(scraperUrl, { method: "GET" }, 25000);
+    if (!res.ok) {
+      console.warn(`[Animelok ScraperAPI(render)] ${res.status} for ${url}`);
+      throw new Error(`ScraperAPI(render) failed: ${res.status}`);
+    }
+    console.info(`[Animelok] ScraperAPI(render) success for ${url}`);
     return res;
   };
 
   try {
-    const result = await Promise.any([directTrack(), scraperTrack()]);
+    const result = await Promise.any([directTrack(), scraperFastTrack(), scraperRenderTrack()]);
     console.info(`[Animelok] Success for ${url}`);
     return result;
   } catch (e: any) {
@@ -87,14 +99,15 @@ export async function getAnilistId(malId: string): Promise<string | null> {
   if (anilistCache.has(malId)) return anilistCache.get(malId)!;
   try {
     const query = `query ($id: Int) { Media (idMal: $id, type: ANIME) { id } }`;
-    const res = await fetchWithProxy("https://graphql.anilist.co", {
+    // AniList is a public API — no Cloudflare, no proxy needed
+    const res = await fetchWithTimeout("https://graphql.anilist.co", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
       body: JSON.stringify({ query, variables: { id: parseInt(malId) } }),
-    });
+    }, 8000);
     if (res.ok) {
       const data = (await res.json()) as any;
       const id = data.data?.Media?.id?.toString();
