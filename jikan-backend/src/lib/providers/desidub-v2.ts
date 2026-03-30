@@ -12,6 +12,36 @@ const decodeB64 = (str: string) => {
   }
 };
 
+const getCommonHeaders = (referer: string = "https://www.desidubanime.me/") => ({
+  "User-Agent": USER_AGENT,
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Referer": referer,
+  "Sec-Ch-Ua": '"Chromium";v="125", "Not.A/Brand";v="24"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1"
+});
+
+const fetchWithTimeout = async (url: string, options: any = {}) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 6000); // 6 second individual fetch timeout
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+};
+
 // Known anime mappings for DesiDubAnime
 const KNOWN_ANIME_MAPPING: Record<string, string> = {
     'jujutsu kaisen': 'jujutsu-kaisen-season-3',
@@ -37,7 +67,7 @@ const KNOWN_ANIME_MAPPING: Record<string, string> = {
 export async function searchDesiDub(query: string) {
     try {
         await desidubLimiter.acquire();
-        await delay(1000); // Additional delay between requests
+        await delay(500); 
 
         const normalizedQuery = query.toLowerCase().trim();
         console.log('[DesiDub] Searching for:', normalizedQuery);
@@ -51,8 +81,8 @@ export async function searchDesiDub(query: string) {
             try {
                 const url = `https://www.desidubanime.me/anime/${slug}/`;
                 const res = await retryWithBackoff(async () => {
-                    return await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-                }, 2, 1000);
+                    return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+                }, 1, 1000);
 
                 if (res.ok) {
                     const html = await res.text();
@@ -69,18 +99,16 @@ export async function searchDesiDub(query: string) {
             }
         }
 
-        // Try to generate likely slug patterns
+        // Try to generate likely slug patterns in parallel
         const slugCandidates = generateSlugCandidates(normalizedQuery);
-        console.log('[DesiDub] Generated slug candidates:', slugCandidates);
+        console.log('[DesiDub] Checking slug candidates in parallel:', slugCandidates);
 
-        for (const slug of slugCandidates) {
-            try {
+        try {
+            const results = await Promise.any(slugCandidates.map(async (slug) => {
                 const url = `https://www.desidubanime.me/anime/${slug}/`;
-                console.log('[DesiDub] Checking slug:', slug);
-
                 const res = await retryWithBackoff(async () => {
-                    return await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-                }, 2, 1000);
+                    return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+                }, 0, 0); // No retries/delays for parallel checks
 
                 if (res.ok) {
                     const html = await res.text();
@@ -88,23 +116,29 @@ export async function searchDesiDub(query: string) {
                     const title = $('.data h1, h1, .title').first().text().trim();
                     const image = $('.poster img, img').first().attr('src') || $('.poster img, img').first().attr('data-src');
 
+                    // Allow flexible title match (e.g., first word)
                     if (title && title.toLowerCase().includes(normalizedQuery.split(' ')[0])) {
-                        console.log('[DesiDub] Found anime via slug generation:', { title, slug });
                         return [{ title, slug, image }];
                     }
                 }
-            } catch (e) {
-                // Continue to next candidate
+                throw new Error('Not found');
+            }));
+            
+            if (results && results.length > 0) {
+                console.log('[DesiDub] Found anime via parallel slug checking');
+                return results;
             }
+        } catch (e) {
+            // Aggregate error means all candidates failed
         }
 
-        // Fallback: Try the search page (even though it might not work)
+        // Fallback: Try the search page
         const searchUrl = `https://www.desidubanime.me/search/${encodeURIComponent(query)}/`;
         console.log('[DesiDub] Falling back to search URL:', searchUrl);
 
         const res = await retryWithBackoff(async () => {
-            return await fetch(searchUrl, { headers: { "User-Agent": USER_AGENT } });
-        }, 3, 2000);
+            return await fetchWithTimeout(searchUrl, { headers: getCommonHeaders() });
+        }, 1, 2000);
 
         if (res.ok) {
             const html = await res.text();
@@ -192,17 +226,17 @@ function extractAnimeId(html: string): string | null {
 export async function getDesiDubInfo(slug: string) {
   try {
     await desidubLimiter.acquire();
-    await delay(1000);
+    await delay(500);
 
     const url = `https://www.desidubanime.me/anime/${slug}/`;
     console.log("[DesiDub] Getting info:", url);
 
     const res = await retryWithBackoff(
       async () => {
-        return await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+        return await fetchWithTimeout(url, { headers: getCommonHeaders() });
       },
-      3,
-      2000,
+      1,
+      1000,
     );
 
     if (!res.ok) return null;
@@ -224,15 +258,11 @@ export async function getDesiDubInfo(slug: string) {
 
         const ajaxRes = await retryWithBackoff(
           async () => {
-            return await fetch(ajaxUrl, {
-              headers: {
-                "User-Agent": USER_AGENT,
-                "Accept": "*/*",
-                "Referer": url
-              }
+            return await fetchWithTimeout(ajaxUrl, {
+              headers: getCommonHeaders(url)
             });
           },
-          2,
+          1,
           1000,
         );
 
@@ -338,17 +368,17 @@ export async function getDesiDubInfo(slug: string) {
 export async function getDesiDubSources(id: string) {
   try {
     await desidubLimiter.acquire();
-    await delay(1000);
+    await delay(500);
 
     const url = `https://www.desidubanime.me/watch/${id}/`;
     console.log("[DesiDub] Getting sources:", url);
 
     const response = await retryWithBackoff(
       async () => {
-        return await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+        return await fetchWithTimeout(url, { headers: getCommonHeaders() });
       },
-      3,
-      2000,
+      1,
+      1000,
     );
 
     if (!response.ok) return [];
