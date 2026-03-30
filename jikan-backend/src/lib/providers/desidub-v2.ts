@@ -51,14 +51,14 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
   }
 };
 
-// CORS Proxy implementation using the provided API key (Racing Strategy)
+// CORS Proxy implementation using Corsfix (Atomic Racing Strategy)
 const fetchWithProxy = async (url: string, options: any = {}) => {
-  const API_KEY = "987d90d7";
-  const proxyUrl = `https://proxy.cors.sh/${url}`;
+  const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
+  const proxyUrl = `https://proxy.corsfix.com/?url=${url}`;
 
   const directTrack = async () => {
     console.log(`[DesiDub] Racing Direct: ${url}`);
-    const res = await fetchWithTimeout(url, options, 3500);
+    const res = await fetchWithTimeout(url, options, 3000);
     if (res.status === 403 || res.status === 503) {
       throw new Error("Direct blocked");
     }
@@ -66,17 +66,17 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   };
 
   const proxyTrack = async () => {
-    // Subtle delay to favor direct if it's fast
-    await new Promise(r => setTimeout(r, 800)); 
-    console.log(`[DesiDub] Racing Proxy: ${url}`);
+    // 500ms delay to favor direct, but fire proxy near-instantly for Vercel
+    await new Promise(r => setTimeout(r, 500)); 
+    console.log(`[DesiDub] Racing Corsfix: ${url}`);
     const proxyOptions = {
       ...options,
       headers: {
         ...options.headers,
-        "x-cors-api-key": API_KEY,
+        "x-corsfix-key": API_KEY,
       }
     };
-    const res = await fetchWithTimeout(proxyUrl, proxyOptions, 6500);
+    const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
     if (!res.ok && res.status !== 404) {
       throw new Error(`Proxy failed: ${res.status}`);
     }
