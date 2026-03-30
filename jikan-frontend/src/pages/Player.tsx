@@ -318,11 +318,12 @@ const Player = () => {
     setAllSources([]);
     setProvidersUsed('');
 
-    // Fire all 3 providers SEQUENTIALLY with a 500ms gap to avoid rate limits
+    // Fire all 3 providers SEQUENTIALLY with a 1500ms gap to avoid rate limits
+    // Note: Animelok is now last as requested
     const providers = [
-      { name: 'Animelok', fn: () => animeAPI.getWatchAnimelok(episodeId, animeId, ep) },
       { name: 'DesiDub', fn: () => animeAPI.getWatchDesiDub(episodeId, animeId, ep) },
-      { name: 'AHD', fn: () => animeAPI.getWatchAHD(episodeId, animeId, ep) }
+      { name: 'AHD', fn: () => animeAPI.getWatchAHD(episodeId, animeId, ep) },
+      { name: 'Animelok', fn: () => animeAPI.getWatchAnimelok(episodeId, animeId, ep) }
     ];
 
     const fetchSequentially = async () => {
@@ -345,9 +346,9 @@ const Player = () => {
           }
         }
 
-        // Wait 500ms before next provider (except the last one)
+        // Wait 1500ms (1.5s) before next provider (except the last one)
         if (completedCount < providers.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
     };
