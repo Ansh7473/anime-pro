@@ -19,16 +19,6 @@ const streamingRouter = new Hono();
 // Global caches (Titles only)
 const titleCache = new Map<string, string>();
 
-async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (retries <= 0) throw e;
-    await new Promise((res) => setTimeout(res, delay));
-    return fetchWithRetry(fn, retries - 1, delay * 2);
-  }
-}
-
 const fetchWithTimeout = async (url: string, timeout: number = 6000, options: any = {}) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
