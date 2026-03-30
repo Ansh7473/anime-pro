@@ -24,60 +24,62 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
   }
 };
 
-const fetchWithProxy = async (url: string, options: any = {}) => {
-  const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  // Encode target URL before sending to proxy
-  const proxyUrl = `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`;
+// ScraperAPI bypasses Cloudflare IUAM ("Just a moment..." page) which blocks datacenter IPs
+// Rotate across 3 keys = 15,000 free requests/month total
+const SCRAPER_API_KEYS = [
+  process.env.SCRAPER_API_KEY_1 || "",
+  process.env.SCRAPER_API_KEY_2 || "",
+  process.env.SCRAPER_API_KEY_3 || "",
+].filter(k => k.length > 0);
 
+let scraperKeyIndex = 0;
+const getNextScraperKey = () => {
+  if (SCRAPER_API_KEYS.length === 0) return "";
+  const key = SCRAPER_API_KEYS[scraperKeyIndex % SCRAPER_API_KEYS.length];
+  scraperKeyIndex++;
+  return key;
+};
+
+const fetchWithProxy = async (url: string, options: any = {}) => {
+  // Track 1: Direct fetch (works on localhost, blocked on cloud servers by Cloudflare)
   const directTrack = async () => {
     const res = await fetchWithTimeout(url, options, 3000); 
-    if (res.status === 403 || res.status === 503 || res.status === 404) {
-      throw new Error(`Direct blocked/fail: ${res.status}`);
+    if (res.status === 403 || res.status === 503) {
+      const body = await res.clone().text().catch(() => "");
+      if (body.includes("Just a moment") || body.includes("Cloudflare")) {
+        throw new Error(`Cloudflare block: ${res.status}`);
+      }
+      throw new Error(`Direct failed: ${res.status}`);
     }
     return res;
   };
 
-  const proxyTrack = async () => {
-    await new Promise(r => setTimeout(r, 500)); 
+  // Track 2: ScraperAPI - designed specifically to bypass Cloudflare
+  const scraperTrack = async () => {
+    await new Promise(r => setTimeout(r, 300));
+    const key = getNextScraperKey();
+    if (!key) throw new Error("No ScraperAPI key configured");
     
-    // Minimalist Headers: Matches working Desidub provider
-    const proxyHeaders: any = {
-      "User-Agent": USER_AGENT,
-      "Referer": "https://animelok.xyz/",
-      "x-corsfix-key": API_KEY,
-    };
+    const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
+    const scraperOptions: any = { method: options.method || "GET" };
+    if (options.body) scraperOptions.body = options.body;
     
-    // Add only essential headers from options
-    if (options.headers?.["Content-Type"]) proxyHeaders["Content-Type"] = options.headers["Content-Type"];
-
-    try {
-      const proxyOptions = { ...options, headers: proxyHeaders };
-      const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
-      
-      if (!res.ok) {
-         // Debugging: Log the status code using clone to preserve stream
-         const resClone = res.clone();
-         const body = await resClone.text().catch(() => "N/A");
-         console.warn(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
-         if (res.status !== 404) throw new Error(`Proxy failed: ${res.status}`);
-      }
-      return res;
-    } catch (err: any) {
-      console.error(`[Animelok Proxy Exception] ${url} error: ${err.name} - ${err.message}`);
-      throw err;
+    const res = await fetchWithTimeout(scraperUrl, scraperOptions, 15000);
+    if (!res.ok) {
+      console.warn(`[Animelok ScraperAPI] ${res.status} for ${url}`);
+      throw new Error(`ScraperAPI failed: ${res.status}`);
     }
+    console.info(`[Animelok] ScraperAPI success for ${url}`);
+    return res;
   };
 
   try {
-    const result = await Promise.any([directTrack(), proxyTrack()]);
-    console.log(`[Animelok] Success for ${url}`);
+    const result = await Promise.any([directTrack(), scraperTrack()]);
+    console.info(`[Animelok] Success for ${url}`);
     return result;
   } catch (e: any) {
     console.error(`[Animelok] Total failure for ${url}: ${e.message}`);
-    // One last desperate try bypasses everything
-    return await fetchWithTimeout(url, options, 2000).catch(() => {
-        throw new Error("Network saturation/Total failure");
-    });
+    throw new Error(`Animelok blocked by Cloudflare: ${e.message}`);
   }
 };
 
