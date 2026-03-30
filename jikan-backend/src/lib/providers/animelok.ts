@@ -67,7 +67,15 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cmd: "request.get", url, maxTimeout: 30000 }),
+          body: JSON.stringify({
+            cmd: "request.get",
+            url,
+            maxTimeout: 30000,
+            headers: {
+              Accept: "application/json, text/plain, */*",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+          }),
         },
         35000
       );
@@ -76,8 +84,13 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
       if (data.status !== "ok" || !data.solution?.response) {
         throw new Error(`FlareSolverr: ${data.status} - ${data.message}`);
       }
+      const responseText = data.solution.response as string;
+      console.info(`[Animelok] FlareSolverr response preview: ${responseText.slice(0, 120)}`);
+      if (responseText.trim().startsWith("<")) {
+        throw new Error("FlareSolverr returned HTML — API rejected browser headers");
+      }
       console.info(`[Animelok] FlareSolverr success for ${url}`);
-      return new Response(data.solution.response, {
+      return new Response(responseText, {
         status: data.solution.status || 200,
         headers: { "Content-Type": "application/json" },
       });
