@@ -51,7 +51,7 @@ let fsSessionWarmExpiry = 0;
 const warmFlareSolverrSession = async (): Promise<void> => {
   if (fsSessionWarmed && Date.now() < fsSessionWarmExpiry) return;
 
-  console.info("[Animelok] Warming FlareSolverr session with watch page visit...");
+  console.info("[Animelok] Warming FlareSolverr session...");
   // Create session (ignore error if it already exists)
   await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
@@ -59,26 +59,32 @@ const warmFlareSolverrSession = async (): Promise<void> => {
     body: JSON.stringify({ cmd: "sessions.create", session: FS_SESSION }),
   }, 10000).catch(() => {});
 
-  // Visit the homepage first (CF bypass)
-  await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+  // Visit homepage to get CF clearance (non-fatal — FS service might be busy)
+  const homeResult = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz", session: FS_SESSION, maxTimeout: 30000 }),
-  }, 35000).catch(() => {});
+  }, 35000).catch((e: any) => { console.warn(`[Animelok] FS homepage warning: ${e.message}`); return null; });
 
-  // Also visit a watch page — this sets the proper Referer context the API needs
-  const watchRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+  if (!homeResult) {
+    throw new Error("FlareSolverr unavailable (homepage visit failed)");
+  }
+
+  const homeData = (await (homeResult as Response).json().catch(() => ({ status: "error" }))) as any;
+  if (homeData.status !== "ok") {
+    throw new Error(`FlareSolverr session warm failed: ${homeData.message || homeData.status}`);
+  }
+
+  // Also visit a watch page for Referer context (non-fatal — this URL can return 500)
+  await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz/watch/one-piece-episode-1", session: FS_SESSION, maxTimeout: 30000 }),
-  }, 35000);
-  if (!watchRes.ok) throw new Error(`FlareSolverr watch page HTTP ${watchRes.status}`);
-  const watchData = (await watchRes.json()) as any;
-  if (watchData.status !== "ok") throw new Error(`FlareSolverr watch: ${watchData.message}`);
+  }, 35000).catch((e: any) => console.warn(`[Animelok] FS watch page warning (non-fatal): ${e.message}`));
 
   fsSessionWarmed = true;
   fsSessionWarmExpiry = Date.now() + 22 * 60 * 60 * 1000;
-  console.info("[Animelok] FlareSolverr session warmed — watch page Referer context active");
+  console.info("[Animelok] FlareSolverr session warmed");
 };
 
 const flaresolverrFetch = async (url: string): Promise<Response> => {
@@ -326,7 +332,7 @@ export async function getAnimelokSources(slug: string, ep: number) {
           } catch (e) {
             // ignore parse error if not valid json
           }
-        } 
+        }
 
         return {
           name: s.name + (s.tip ? ` (${s.tip})` : ""),
