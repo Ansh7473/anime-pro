@@ -40,7 +40,7 @@ const getNextScraperKey = () => {
   return key;
 };
 
-const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL || "";
+const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL || "http://flaresolverr.railway.internal:8080";
 console.info(`[Animelok] FLARESOLVERR_URL loaded: "${FLARESOLVERR_URL}" (length: ${FLARESOLVERR_URL.length})`);
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
