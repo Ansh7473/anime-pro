@@ -87,10 +87,12 @@ streamingRouter.get("/sources/animelok", async (c) => {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    // Try deterministic ID slugs
-    for (const id of idCandidates) {
-      const candidateSlug = `${baseSlug}-${id}`;
-      const results = await getAnimelokSources(candidateSlug, ep);
+    // Try deterministic ID slugs + raw baseSlug
+    const slugCandidates = idCandidates.map(id => `${baseSlug}-${id}`);
+    slugCandidates.push(baseSlug); // Try without ID (e.g. "one-piece")
+
+    for (const slug of slugCandidates) {
+      const results = await getAnimelokSources(slug, ep);
       if (results.sources && results.sources.length > 0) {
         return c.json({
           provider: "Animelok",
@@ -169,7 +171,7 @@ streamingRouter.get("/sources/desidub", async (c) => {
                 }
                 throw new Error("No special case");
               })(),
-              
+
               // Track 2: Direct Pattern 1 (Standard)
               (async () => {
                 const res = await getDesiDubSources(`${knownSlug}-episode-${ep}`);
@@ -324,7 +326,7 @@ streamingRouter.get("/sources", async (c) => {
           if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
           else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
           else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
-          
+
           if (knownSlug) {
             const info = await getDesiDubInfo(knownSlug);
             const epData = info?.episodes?.find((e: any) => parseInt(e.number) === ep) || info?.episodes?.[0];
@@ -409,7 +411,7 @@ streamingRouter.get("/episode-metadata", async (c) => {
     },
     async () => {
       // 2. DesiDubAnime metadata
-      if (metadataResult) return; 
+      if (metadataResult) return;
       try {
         console.log("[Metadata] Sequential Provider: Attempting DesiDubAnime (1s delay)...");
         for (const title of titles) {
@@ -418,7 +420,7 @@ streamingRouter.get("/episode-metadata", async (c) => {
           if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
           else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
           else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
-          
+
           if (knownSlug) {
             const animeInfo = await getDesiDubInfo(knownSlug);
             if (animeInfo && animeInfo.episodes && animeInfo.episodes.length > 0) {
