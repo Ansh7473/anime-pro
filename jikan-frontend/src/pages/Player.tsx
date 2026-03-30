@@ -318,20 +318,24 @@ const Player = () => {
     setAllSources([]);
     setProvidersUsed('');
 
-    // Fire all 3 providers in parallel
+    // Fire all 3 providers SEQUENTIALLY with a 500ms gap to avoid rate limits
     const providers = [
       { name: 'Animelok', fn: () => animeAPI.getWatchAnimelok(episodeId, animeId, ep) },
       { name: 'DesiDub', fn: () => animeAPI.getWatchDesiDub(episodeId, animeId, ep) },
       { name: 'AHD', fn: () => animeAPI.getWatchAHD(episodeId, animeId, ep) }
     ];
 
-    let completedCount = 0;
-    providers.forEach(p => {
-      p.fn()
-        .then(res => handleProviderResponse(res, p.name))
-        .catch(err => console.error(`[Player] ${p.name} fetch failed:`, err))
-        .finally(() => {
-          if (requestId !== currentRequestRef.current) return;
+    const fetchSequentially = async () => {
+      let completedCount = 0;
+      for (const p of providers) {
+        if (requestId !== currentRequestRef.current) return;
+
+        try {
+          const res = await p.fn();
+          handleProviderResponse(res, p.name);
+        } catch (err) {
+          console.error(`[Player] ${p.name} fetch failed:`, err);
+        } finally {
           completedCount++;
           if (completedCount === providers.length) {
             setLoadingStream(false);
@@ -339,8 +343,16 @@ const Player = () => {
               setError('No sources found for this episode across all providers.');
             }
           }
-        });
-    });
+        }
+
+        // Wait 500ms before next provider (except the last one)
+        if (completedCount < providers.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    };
+
+    fetchSequentially();
   }, [episodeId, animeId, ep]); // NOTE: `category` intentionally omitted
 
   // Log to watch history when stream starts
