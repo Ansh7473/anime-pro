@@ -26,21 +26,21 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  const proxyUrl = `https://proxy.corsfix.com/?url=${url}`;
+  // Encode URL for proxy to ensure search parameters are handled correctly
+  const proxyUrl = `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`;
 
   const directTrack = async () => {
-    console.log(`[Animelok] Racing Direct: ${url}`);
-    const res = await fetchWithTimeout(url, options, 3500);
-    if (res.status === 403 || res.status === 503) {
-      throw new Error("Direct blocked");
+    const res = await fetchWithTimeout(url, options, 3000); // Shorter direct timeout for Vercel
+    if (res.status === 403 || res.status === 503 || res.status === 404) {
+      throw new Error(`Direct failed: ${res.status}`);
     }
+    console.log(`[Animelok] Success via Direct: ${url}`);
     return res;
   };
 
   const proxyTrack = async () => {
-    // 500ms delay to favor direct
+    // 500ms delay to favor direct on localhost, but fire proxy near-instantly for Vercel
     await new Promise(r => setTimeout(r, 500)); 
-    console.log(`[Animelok] Racing Corsfix: ${url}`);
     const proxyOptions = {
       ...options,
       headers: {
@@ -52,13 +52,14 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     if (!res.ok && res.status !== 404) {
       throw new Error(`Proxy failed: ${res.status}`);
     }
+    console.log(`[Animelok] Success via Proxy: ${url}`);
     return res;
   };
 
   try {
     return await Promise.any([directTrack(), proxyTrack()]);
   } catch (e) {
-    console.error(`[Animelok] Both tracks failed for ${url}`);
+    console.error(`[Animelok] Total failure for ${url}`);
     return await fetchWithTimeout(url, options, 2000).catch(() => {
         throw new Error("Network saturation/Total failure");
     });
@@ -69,7 +70,7 @@ export async function getAnilistId(malId: string): Promise<string | null> {
   if (anilistCache.has(malId)) return anilistCache.get(malId)!;
   try {
     const query = `query ($id: Int) { Media (idMal: $id, type: ANIME) { id } }`;
-    const res = await fetch("https://graphql.anilist.co", {
+    const res = await fetchWithProxy("https://graphql.anilist.co", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -86,7 +87,7 @@ export async function getAnilistId(malId: string): Promise<string | null> {
       }
     }
   } catch (e) {
-    console.error(`[Anilist] ID fetch error:`, e);
+    console.error(`[Anilist Proxy] ID fetch error:`, e);
   }
   return null;
 }
