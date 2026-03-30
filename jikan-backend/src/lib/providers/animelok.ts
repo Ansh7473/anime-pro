@@ -26,8 +26,8 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  // Alignment with working Desidub format: NO encoding, just raw concat
-  const proxyUrl = `https://proxy.corsfix.com/?url=${url}`;
+  // Encode target URL before sending to proxy
+  const proxyUrl = `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`;
 
   const directTrack = async () => {
     const res = await fetchWithTimeout(url, options, 3000); 
