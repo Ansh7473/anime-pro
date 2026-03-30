@@ -89,46 +89,56 @@ streamingRouter.get("/sources/animelok", async (c) => {
 
   try {
     const aniId = await getAnilistId(malId);
-    const idCandidates = [malId];
-    if (aniId && aniId !== malId) idCandidates.unshift(aniId);
+    
+    // First Priority: Search by title (most reliable for Animelok)
+    const searchResults = await searchAnimelok(titles[0]);
+    const match = searchResults.find((r: any) => 
+      titles.some(t => (r.title || r.slug || "").toLowerCase().includes(t.toLowerCase()))
+    ) || searchResults[0];
 
-    const baseSlug = titles[0]
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-
-    const animelokResults = await fetchWithRetry(async () => {
-      for (const id of idCandidates) {
-        const candidateSlug = `${baseSlug}-${id}`;
-        const results = await getAnimelokSources(candidateSlug, ep);
-        if (results.sources && results.sources.length > 0) return results;
+    if (match) {
+      const slug = match.slug || match.id;
+      const results = await getAnimelokSources(slug, ep);
+      if (results.sources?.length > 0) {
+        return c.json({
+          provider: "Animelok",
+          status: 200,
+          data: {
+            sources: results.sources.map((s: any) => ({ ...s, provider: "Animelok" })),
+            subtitles: results.subtitles || []
+          },
+        });
       }
-      // Try Search Fallback
-      const lokResults = await searchAnimelok(titles[0]);
-      const lokMatch = lokResults.find((r: any) =>
-        titles.some((t) => {
-          const rt = (r.title || r.slug || "").toLowerCase();
-          const tt = t.toLowerCase();
-          return rt.includes(tt) || tt.includes(rt);
-        }),
-      );
-      if (lokMatch) {
-        const slug = lokMatch.slug || lokMatch.id;
-        return await getAnimelokSources(slug, ep);
-      }
-      return null;
-    });
+    }
 
-    if (animelokResults && animelokResults.sources?.length > 0) {
+    // Second Priority: Anilist ID lookup (if search failed)
+    if (aniId) {
+      const results = await getAnimelokSources(aniId, ep);
+      if (results.sources?.length > 0) {
+        return c.json({
+          provider: "Animelok",
+          status: 200,
+          data: {
+            sources: results.sources.map((s: any) => ({ ...s, provider: "Animelok" })),
+            subtitles: results.subtitles || []
+          },
+        });
+      }
+    }
+
+    // Third Priority: MAL ID (simple fallback)
+    const malResults = await getAnimelokSources(malId, ep);
+    if (malResults.sources?.length > 0) {
       return c.json({
         provider: "Animelok",
         status: 200,
         data: {
-          sources: animelokResults.sources.map((s: any) => ({ ...s, provider: "Animelok" })),
-          subtitles: animelokResults.subtitles || []
+          sources: malResults.sources.map((s: any) => ({ ...s, provider: "Animelok" })),
+          subtitles: malResults.subtitles || []
         },
       });
     }
+
   } catch (e) {
     console.log("[Streaming] Animelok route error:", e);
   }
