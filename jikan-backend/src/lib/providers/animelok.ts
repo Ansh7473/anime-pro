@@ -9,7 +9,7 @@ const ANIMELOK_HEADERS = {
 const anilistCache = new Map<string, string>();
 
 /**
- * Racing Proxy Implementation for Animelok (Vercel Fixs)
+ * Racing Proxy Implementation for Animelok (Vercel Fix)
  */
 const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) => {
   const controller = new AbortController();
@@ -26,20 +26,19 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  // Encode URL for proxy to ensure search parameters are handled correctly
-  const proxyUrl = `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`;
+  // Updated format: some proxies work better with ?https://... than ?url=...
+  const proxyUrl = `https://proxy.corsfix.com/?${url}`;
 
   const directTrack = async () => {
-    const res = await fetchWithTimeout(url, options, 3000); // Shorter direct timeout for Vercel
+    const res = await fetchWithTimeout(url, options, 3000); 
     if (res.status === 403 || res.status === 503 || res.status === 404) {
       throw new Error(`Direct failed: ${res.status}`);
     }
-    console.log(`[Animelok] Success via Direct: ${url}`);
     return res;
   };
 
   const proxyTrack = async () => {
-    // 500ms delay to favor direct on localhost, but fire proxy near-instantly for Vercel
+    // Wait for the 500ms delay to favor direct fetches
     await new Promise(r => setTimeout(r, 500)); 
     const proxyOptions = {
       ...options,
@@ -49,17 +48,22 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
       }
     };
     const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
-    if (!res.ok && res.status !== 404) {
-      throw new Error(`Proxy failed: ${res.status}`);
+    if (!res.ok) {
+       // Debugging for Vercel: Log the first 100 chars of the error body
+       const body = await res.text().catch(() => "N/A");
+       console.log(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
+       if (res.status !== 404) throw new Error(`Proxy failed: ${res.status}`);
     }
-    console.log(`[Animelok] Success via Proxy: ${url}`);
     return res;
   };
 
   try {
-    return await Promise.any([directTrack(), proxyTrack()]);
+    const result = await Promise.any([directTrack(), proxyTrack()]);
+    console.log(`[Animelok] Success for ${url}`);
+    return result;
   } catch (e) {
     console.error(`[Animelok] Total failure for ${url}`);
+    // If both failed, attempt one last desperate direct fetch to see the raw response
     return await fetchWithTimeout(url, options, 2000).catch(() => {
         throw new Error("Network saturation/Total failure");
     });
