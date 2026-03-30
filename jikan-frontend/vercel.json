@@ -6,7 +6,7 @@
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "https://anime-pro-production.up.railway.app/api/$1"
+            "destination": "https://anime-pro-production.up.railway.app/api/v1"
         },
         {
             "source": "/(.*)",
