@@ -161,20 +161,34 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     }
   };
 
-  // Track 3: ScraperAPI render=true — headless browser solves CF IUAM challenge
+  // Track 3: ScraperAPI premium=true — residential IPs bypass both CF and animelok's datacenter IP block
+  // animelok.xyz redirects Railway/datacenter IPs to /blocked — only residential IPs work
   const scraperTrack = async () => {
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 300));
     const key = getNextScraperKey();
     if (!key) throw new Error("No ScraperAPI key");
     try {
-      const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
-      const res = await fetchWithTimeout(scraperUrl, { method: "GET" }, 30000);
+      // premium=true = residential proxy pool, render=true = headless Chrome for CF bypass
+      const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true&premium=true`;
+      const res = await fetchWithTimeout(scraperUrl, {
+        method: "GET",
+        headers: {
+          "x-sapi-referer": "https://animelok.xyz/",
+        }
+      }, 60000);  // 60s — premium residential render takes longer
       if (!res.ok) throw new Error(`ScraperAPI ${res.status}`);
       const body = await res.clone().text().catch(() => "");
+      console.info(`[Animelok ScraperAPI] preview (${body.length}): ${body.slice(0, 100)}`);
       if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
-        throw new Error("ScraperAPI hit CF challenge - need more time");
+        throw new Error("ScraperAPI hit CF challenge");
       }
-      console.info(`[Animelok] ScraperAPI success for ${url}`);
+      if (body.includes("/blocked") || body.includes("Access Denied")) {
+        throw new Error("ScraperAPI IP also blocked by animelok");
+      }
+      if (body.startsWith("Unauthorized") || body === "Unauthorized") {
+        throw new Error("ScraperAPI: Unauthorized — animelok rejected request");
+      }
+      console.info(`[Animelok] ScraperAPI (premium) success for ${url}`);
       return res;
     } catch (err: any) {
       console.error(`[Animelok ScraperAPI] ${url}: ${err.message}`);
@@ -183,12 +197,15 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   };
 
   try {
-    const result = await Promise.any([directTrack(), flaresolverrTrack(), scraperTrack()]);
+    // FlareSolverr is on Railway (datacenter IP) → gets blocked by animelok's /blocked redirect
+    // ScraperAPI premium uses residential IPs that animelok can't bulk-block
+    // Direct fetch is for localhost dev only
+    const result = await Promise.any([directTrack(), scraperTrack(), flaresolverrTrack()]);
     console.info(`[Animelok] Success for ${url}`);
     return result;
   } catch (e: any) {
     console.error(`[Animelok] Total failure for ${url}: ${e.message}`);
-    throw new Error(`Animelok blocked by Cloudflare: ${e.message}`);
+    throw new Error(`Animelok blocked: ${e.message}`);
   }
 };
 
