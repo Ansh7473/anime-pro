@@ -71,9 +71,12 @@ streamingRouter.get("/sources", async (c) => {
     `[Streaming] Fetching aggregated sources for ${mainTitle} Ep ${ep}...`,
   );
 
-  try {
+  const allAggregatedSources: any[] = [];
+  const allAggregatedSubtitles: any[] = [];
+  const successfulProviders: string[] = [];
 
-    // 1. Try Animelok first (Primary)
+  // Provider 1: Animelok
+  const fetchAnimelok = async () => {
     try {
       const aniId = await getAnilistId(malId);
       const idCandidates = [malId];
@@ -107,21 +110,20 @@ streamingRouter.get("/sources", async (c) => {
       });
 
       if (animelokResults && animelokResults.sources?.length > 0) {
-        console.log(`[Streaming] Found ${animelokResults.sources.length} sources from Animelok`);
-        return c.json({
-          provider: "Animelok",
-          status: 200,
-          data: { 
-            sources: animelokResults.sources.map((s: any) => ({ ...s, provider: "Animelok" })), 
-            subtitles: animelokResults.subtitles || [] 
-          },
-        });
+        successfulProviders.push("Animelok");
+        return {
+          sources: animelokResults.sources.map((s: any) => ({ ...s, provider: "Animelok" })),
+          subtitles: animelokResults.subtitles || []
+        };
       }
     } catch (e) {
       console.log("[Streaming] Animelok pipeline failed:", e);
     }
+    return null;
+  };
 
-    // 2. Try DesiDubAnime (Secondary)
+  // Provider 2: DesiDubAnime
+  const fetchDesiDub = async () => {
     try {
       const desidubData = await fetchWithRetry(async () => {
         for (const title of titles) {
@@ -164,17 +166,20 @@ streamingRouter.get("/sources", async (c) => {
       });
 
       if (desidubData && desidubData.length > 0) {
-        return c.json({
-          provider: "DesiDubAnime",
-          status: 200,
-          data: { sources: desidubData.map((s: any) => ({ ...s, provider: "DesiDubAnime" })), subtitles: [] },
-        });
+        successfulProviders.push("DesiDubAnime");
+        return {
+          sources: desidubData.map((s: any) => ({ ...s, provider: "DesiDubAnime" })),
+          subtitles: []
+        };
       }
     } catch (e) {
       console.log("[Streaming] DesiDubAnime failed:", e);
     }
+    return null;
+  };
 
-    // 3. Try AnimeHindiDubbed-WP (Tertiary)
+  // Provider 3: AnimeHindiDubbed-WP
+  const fetchAHD = async () => {
     try {
       const ahdData = await fetchWithRetry(async () => {
         for (const title of titles) {
@@ -189,17 +194,43 @@ streamingRouter.get("/sources", async (c) => {
       });
 
       if (ahdData && ahdData.length > 0) {
-        return c.json({
-          provider: "AnimeHindiDubbed-WP",
-          status: 200,
-          data: { sources: ahdData.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })), subtitles: [] },
-        });
+        successfulProviders.push("AnimeHindiDubbed-WP");
+        return {
+          sources: ahdData.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })),
+          subtitles: []
+        };
       }
     } catch (e) {
       console.log("[Streaming] AnimeHindiDubbed-WP failed:", e);
     }
-  } catch (e: any) {
-    console.error("[Streaming Router] Error:", e.message);
+    return null;
+  };
+
+  // Execute all in parallel
+  const results = await Promise.allSettled([
+    fetchAnimelok(),
+    fetchDesiDub(),
+    fetchAHD()
+  ]);
+
+  // Aggregate results
+  results.forEach(result => {
+    if (result.status === "fulfilled" && result.value) {
+      allAggregatedSources.push(...result.value.sources);
+      allAggregatedSubtitles.push(...result.value.subtitles);
+    }
+  });
+
+  if (allAggregatedSources.length > 0) {
+    console.log(`[Streaming] Found ${allAggregatedSources.length} total sources from ${successfulProviders.join(", ")}`);
+    return c.json({
+      provider: successfulProviders.length > 1 ? "Aggregated" : successfulProviders[0] || "Unknown",
+      status: 200,
+      data: {
+        sources: allAggregatedSources,
+        subtitles: allAggregatedSubtitles
+      },
+    });
   }
 
   return c.json(
