@@ -1,8 +1,17 @@
 import * as cheerio from "cheerio";
 import { desidubLimiter, delay, retryWithBackoff } from "../rateLimiter.js";
 
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+];
+
+const getRandomUA = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
 const decodeB64 = (str: string) => {
   try {
@@ -13,7 +22,7 @@ const decodeB64 = (str: string) => {
 };
 
 const getCommonHeaders = (referer: string = "https://www.desidubanime.me/") => ({
-  "User-Agent": USER_AGENT,
+  "User-Agent": getRandomUA(),
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
   "Accept-Language": "en-US,en;q=0.9",
   "Cache-Control": "no-cache",
@@ -29,9 +38,9 @@ const getCommonHeaders = (referer: string = "https://www.desidubanime.me/") => (
   "Upgrade-Insecure-Requests": "1"
 });
 
-const fetchWithTimeout = async (url: string, options: any = {}) => {
+const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) => {
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), 6000); // 6 second individual fetch timeout
+  const id = setTimeout(() => controller.abort(), timeout);
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
@@ -39,6 +48,38 @@ const fetchWithTimeout = async (url: string, options: any = {}) => {
   } catch (e) {
     clearTimeout(id);
     throw e;
+  }
+};
+
+// CORS Proxy implementation using the provided API key (assume CORS.SH format)
+const fetchWithProxy = async (url: string, options: any = {}) => {
+  const API_KEY = "987d90d7";
+  const proxyUrl = `https://proxy.cors.sh/${url}`;
+
+  try {
+    // Attempt 1: Direct Fetch (Faster, 4s timeout)
+    console.log(`[DesiDub] Direct attempt: ${url}`);
+    const res = await fetchWithTimeout(url, options, 4000);
+    
+    // If Cloudflare blocks us (403), move to proxy immediately
+    if (res.status === 403 || res.status === 503) {
+      throw new Error(`Direct block: ${res.status}`);
+    }
+    
+    return res;
+  } catch (e) {
+    // Attempt 2: Proxy Fallback
+    console.log(`[DesiDub] Retrying via CORS Proxy: ${url}`);
+    const proxyOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        "x-cors-api-key": API_KEY,
+      }
+    };
+    
+    // Primary Proxy: CORS.SH
+    return await fetchWithTimeout(proxyUrl, proxyOptions, 6000);
   }
 };
 
@@ -81,7 +122,7 @@ export async function searchDesiDub(query: string) {
             try {
                 const url = `https://www.desidubanime.me/anime/${slug}/`;
                 const res = await retryWithBackoff(async () => {
-                    return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+                    return await fetchWithProxy(url, { headers: getCommonHeaders() });
                 }, 1, 1000);
 
                 if (res.ok) {
@@ -107,7 +148,7 @@ export async function searchDesiDub(query: string) {
             const results = await Promise.any(slugCandidates.map(async (slug) => {
                 const url = `https://www.desidubanime.me/anime/${slug}/`;
                 const res = await retryWithBackoff(async () => {
-                    return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+                    return await fetchWithProxy(url, { headers: getCommonHeaders() });
                 }, 0, 0); // No retries/delays for parallel checks
 
                 if (res.ok) {
@@ -137,7 +178,7 @@ export async function searchDesiDub(query: string) {
         console.log('[DesiDub] Falling back to search URL:', searchUrl);
 
         const res = await retryWithBackoff(async () => {
-            return await fetchWithTimeout(searchUrl, { headers: getCommonHeaders() });
+            return await fetchWithProxy(searchUrl, { headers: getCommonHeaders() });
         }, 1, 2000);
 
         if (res.ok) {
@@ -233,7 +274,7 @@ export async function getDesiDubInfo(slug: string) {
 
     const res = await retryWithBackoff(
       async () => {
-        return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+        return await fetchWithProxy(url, { headers: getCommonHeaders() });
       },
       1,
       1000,
@@ -258,7 +299,7 @@ export async function getDesiDubInfo(slug: string) {
 
         const ajaxRes = await retryWithBackoff(
           async () => {
-            return await fetchWithTimeout(ajaxUrl, {
+            return await fetchWithProxy(ajaxUrl, {
               headers: getCommonHeaders(url)
             });
           },
@@ -375,7 +416,7 @@ export async function getDesiDubSources(id: string) {
 
     const response = await retryWithBackoff(
       async () => {
-        return await fetchWithTimeout(url, { headers: getCommonHeaders() });
+        return await fetchWithProxy(url, { headers: getCommonHeaders() });
       },
       1,
       1000,
