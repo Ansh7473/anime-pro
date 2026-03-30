@@ -162,23 +162,47 @@ streamingRouter.get("/sources/desidub", async (c) => {
           else if (normalizedTitle.includes('hunter x hunter')) knownSlug = 'hunter-x-hunter';
 
           if (knownSlug) {
-            if (knownSlug === "jujutsu-kaisen-season-3" && ep === 1) {
-              const res = await getDesiDubSources("jujutsu-kaisen-shimetsu-kaiyuu-zenpen-3rd-season-episode-48");
-              if (res && res.length > 0) return res;
-            }
-            const info = await getDesiDubInfo(knownSlug);
-            const episodes = info?.episodes;
-            if (episodes && Array.isArray(episodes) && episodes.length > 0) {
-              const epData = episodes.find((e: any) => parseInt(e.number) === ep) || episodes[0];
-              if (epData?.slug) {
-                const res = await getDesiDubSources(epData.slug);
+            // ATOMIC PARALLELISM: Fire direct patterns and info-scrape track ALL AT ONCE
+            return await Promise.any([
+              // Track 1: Known Special Cases
+              (async () => {
+                if (knownSlug === "jujutsu-kaisen-season-3" && ep === 1) {
+                  const res = await getDesiDubSources("jujutsu-kaisen-shimetsu-kaiyuu-zenpen-3rd-season-episode-48");
+                  if (res && res.length > 0) return res;
+                }
+                throw new Error("No special case");
+              })(),
+              
+              // Track 2: Direct Pattern 1 (Standard)
+              (async () => {
+                const res = await getDesiDubSources(`${knownSlug}-episode-${ep}`);
                 if (res && res.length > 0) return res;
-              }
-            }
-            const directRes = await getDesiDubSources(`${knownSlug}-episode-${ep}`);
-            if (directRes && directRes.length > 0) return directRes;
+                throw new Error("Pattern 1 failed");
+              })(),
+
+              // Track 3: Direct Pattern 2 (Season 1)
+              (async () => {
+                const res = await getDesiDubSources(`${knownSlug}-season-1-episode-${ep}`);
+                if (res && res.length > 0) return res;
+                throw new Error("Pattern 2 failed");
+              })(),
+
+              // Track 4: Info Scrape (The slow fallback)
+              (async () => {
+                const info = await getDesiDubInfo(knownSlug);
+                const episodes = info?.episodes;
+                if (episodes && Array.isArray(episodes) && episodes.length > 0) {
+                  const epData = episodes.find((e: any) => parseInt(e.number) === ep) || episodes[0];
+                  if (epData?.slug) {
+                    const res = await getDesiDubSources(epData.slug);
+                    if (res && res.length > 0) return res;
+                  }
+                }
+                throw new Error("Info scrape failed");
+              })()
+            ]);
           }
-          throw new Error('Not found');
+          throw new Error('No slug for title');
         }));
 
         if (desidubData && desidubData.length > 0) {
