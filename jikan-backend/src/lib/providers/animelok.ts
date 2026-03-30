@@ -43,6 +43,38 @@ const getNextScraperKey = () => {
 const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL || "https://flaresolverr-production-d1e4.up.railway.app";
 console.info(`[Animelok] FLARESOLVERR_URL loaded: "${FLARESOLVERR_URL}" (length: ${FLARESOLVERR_URL.length})`);
 
+// Cookie cache — FlareSolverr gets CF clearance once, we reuse it for 22h
+let cachedAnimelokCookies = "";
+let cachedAnimelokUA = USER_AGENT;
+let animelokCookieExpiry = 0;
+
+const getAnimelokCFCookies = async (): Promise<{ cookies: string; userAgent: string }> => {
+  if (cachedAnimelokCookies && Date.now() < animelokCookieExpiry) {
+    return { cookies: cachedAnimelokCookies, userAgent: cachedAnimelokUA };
+  }
+  console.info("[Animelok] Fetching fresh CF cookies via FlareSolverr homepage visit...");
+  const homeRes = await fetchWithTimeout(
+    `${FLARESOLVERR_URL}/v1`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz", maxTimeout: 30000 }),
+    },
+    35000
+  );
+  if (!homeRes.ok) throw new Error(`FlareSolverr homepage HTTP ${homeRes.status}`);
+  const homeData = (await homeRes.json()) as any;
+  if (homeData.status !== "ok") throw new Error(`FlareSolverr homepage: ${homeData.message}`);
+
+  cachedAnimelokCookies = (homeData.solution?.cookies || [])
+    .map((c: any) => `${c.name}=${c.value}`)
+    .join("; ");
+  cachedAnimelokUA = homeData.solution?.userAgent || USER_AGENT;
+  animelokCookieExpiry = Date.now() + 22 * 60 * 60 * 1000; // CF clearance valid ~24h
+  console.info(`[Animelok] Got ${(homeData.solution?.cookies || []).length} CF cookies, cached for 22h`);
+  return { cookies: cachedAnimelokCookies, userAgent: cachedAnimelokUA };
+};
+
 const fetchWithProxy = async (url: string, options: any = {}) => {
   // Track 1: Direct fetch (works on localhost, fails on cloud due to Cloudflare)
   const directTrack = async () => {
@@ -57,51 +89,42 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     return res;
   };
 
-  // Track 2: FlareSolverr — real Chromium, beats Cloudflare Enterprise
+  // Track 2: FlareSolverr cookie strategy
+  // Step A: Get CF clearance cookies from homepage (cached 22h)
+  // Step B: Direct fetch API with those cookies — fast after first call
   const flaresolverrTrack = async () => {
     await new Promise(r => setTimeout(r, 200));
     try {
       if (!FLARESOLVERR_URL) throw new Error("No FlareSolverr URL set — add FLARESOLVERR_URL env var");
-      const fsRes = await fetchWithTimeout(
-        `${FLARESOLVERR_URL}/v1`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            cmd: "request.get",
-            url,
-            maxTimeout: 30000,
-            headers: {
-              Accept: "application/json, text/plain, */*",
-              "X-Requested-With": "XMLHttpRequest",
-            },
-          }),
+      const { cookies, userAgent } = await getAnimelokCFCookies();
+
+      const apiRes = await fetchWithTimeout(url, {
+        headers: {
+          ...ANIMELOK_HEADERS,
+          "User-Agent": userAgent,
+          Cookie: cookies,
         },
-        35000
-      );
-      if (!fsRes.ok) throw new Error(`FlareSolverr HTTP ${fsRes.status}`);
-      const data = (await fsRes.json()) as any;
-      if (data.status !== "ok" || !data.solution?.response) {
-        throw new Error(`FlareSolverr: ${data.status} - ${data.message}`);
+      }, 15000);
+
+      if (!apiRes.ok) throw new Error(`API HTTP ${apiRes.status}`);
+      const body = await apiRes.text();
+
+      if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
+        // CF cookies expired — clear cache so next call refreshes them
+        cachedAnimelokCookies = "";
+        animelokCookieExpiry = 0;
+        throw new Error("CF clearance cookie expired, will refresh on next call");
       }
-      const responseText = data.solution.response as string;
-      console.info(`[Animelok] FlareSolverr response preview: ${responseText.slice(0, 120)}`);
-      
-      // Chrome's JSON viewer wraps JSON in: <html><body><pre ...>{"json":"here"}</pre></body></html>
-      // We need to extract the actual JSON from the <pre> tag
-      let finalText = responseText;
-      if (responseText.trim().startsWith("<")) {
-        const preMatch = responseText.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
-        if (preMatch && preMatch[1]) {
-          finalText = preMatch[1].trim();
-          console.info(`[Animelok] FlareSolverr extracted JSON from Chrome pre-wrapper (${finalText.length} chars)`);
-        } else {
-          throw new Error("FlareSolverr returned unrecognized HTML — no <pre> tag found");
-        }
+      if (body.startsWith("Unauthorized") || body === "Unauthorized") {
+        // App-level auth from cookies failed — clear and retry
+        cachedAnimelokCookies = "";
+        animelokCookieExpiry = 0;
+        throw new Error("Animelok API returned Unauthorized — clearing cookie cache");
       }
-      console.info(`[Animelok] FlareSolverr success for ${url}`);
-      return new Response(finalText, {
-        status: data.solution.status || 200,
+
+      console.info(`[Animelok] FlareSolverr (cookie) success for ${url}`);
+      return new Response(body, {
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
     } catch (err: any) {
