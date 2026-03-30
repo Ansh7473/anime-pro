@@ -1,0 +1,813 @@
+[
+  {
+    "id": "TC001",
+    "title": "Home page loads and browsing rows are viewable",
+    "description": "Verifies the home page primary content loads and the user can scroll through anime rows.",
+    "category": "Browse Anime Content",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify multiple anime rows with anime cards are displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Browse categories journey: Home to Latest to TV Series",
+    "description": "Verifies users can navigate between core browse categories and view their primary content.",
+    "category": "Browse Anime Content",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to view the latest episodes"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to view TV series"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a TV series listing with anime cards is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Movies page shows loading then populates rows",
+    "description": "Verifies the movies page displays a loader while fetching and then renders movie rows.",
+    "category": "Browse Anime Content",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /movies"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a loading indicator is visible"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the page content to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify movie rows with anime cards are displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Schedule page displays schedule list entries",
+    "description": "Verifies the schedule page primary content is viewable by scrolling through the schedule list.",
+    "category": "Browse Anime Content",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /schedule"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify schedule entries are displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Navigate from a browse card to a details page (from TV Series listing)",
+    "description": "Verifies users can open an anime details page from a browse listing.",
+    "category": "Browse Anime Content",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /tv-series"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime card"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an anime details view is displayed with synopsis and metadata"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Search with query and filters returns results and allows opening a result",
+    "description": "Verifies searching with a query plus genre/type/year filters shows results and a result can be opened.",
+    "category": "Search Anime",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /search"
+      },
+      {
+        "type": "action",
+        "description": "Fill a common anime title keyword into the search query field"
+      },
+      {
+        "type": "action",
+        "description": "Select a genre filter"
+      },
+      {
+        "type": "action",
+        "description": "Select a type filter"
+      },
+      {
+        "type": "action",
+        "description": "Select a year filter"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "action",
+        "description": "Click a search result item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an anime details view is displayed with synopsis and metadata"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Search with restrictive filters shows a no-results state",
+    "description": "Verifies the search page shows a no-results state when an uncommon query plus restrictive filters returns nothing.",
+    "category": "Search Anime",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /search"
+      },
+      {
+        "type": "action",
+        "description": "Fill an uncommon search term into the search query field"
+      },
+      {
+        "type": "action",
+        "description": "Select multiple filters to be highly restrictive"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a no-results state with suggestions is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Search with query only returns results",
+    "description": "Verifies basic search without filters returns a results list.",
+    "category": "Search Anime",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /search"
+      },
+      {
+        "type": "action",
+        "description": "Fill a common anime title keyword into the search query field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify search results are displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Submitting empty search does not crash and keeps user on search page",
+    "description": "Verifies submitting the search form without a query is handled gracefully via UI behavior.",
+    "category": "Search Anime",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /search"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the search interface remains usable and a results or empty state is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Change filters after results updates the result set",
+    "description": "Verifies users can adjust filters after an initial search and see updated results.",
+    "category": "Search Anime",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /search"
+      },
+      {
+        "type": "action",
+        "description": "Fill a common anime title keyword into the search query field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "action",
+        "description": "Select a different genre filter"
+      },
+      {
+        "type": "action",
+        "description": "Submit the search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify search results are displayed for the updated filter selection"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Anime details shows synopsis/metadata and allows selecting an episode to watch",
+    "description": "Verifies the details page shows primary information and episode selection navigates into playback flow.",
+    "category": "View Anime Details",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /tv-series"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime card"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down to the episodes section"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode from the episodes list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the video player view is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Characters section populates on anime details",
+    "description": "Verifies users can reach the characters section and see character list content.",
+    "category": "View Anime Details",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /tv-series"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime card"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down to the characters section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a character list is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Episodes list is browseable via scrolling within details page",
+    "description": "Verifies users can browse the episode list on the details page as a core interaction.",
+    "category": "View Anime Details",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /tv-series"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime card"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down to the episodes section"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the episodes list is displayed and includes multiple entries"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Open details from Latest episodes listing",
+    "description": "Verifies cross-page entry into anime details from the latest episodes page works.",
+    "category": "View Anime Details",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /latest"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down the page"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from the latest episodes list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an anime details view is displayed with synopsis and metadata"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Starting playback from details keeps player usable on load",
+    "description": "Verifies that after navigating to the player from details, core playback UI loads without requiring external actions.",
+    "category": "View Anime Details",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /tv-series"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime card"
+      },
+      {
+        "type": "action",
+        "description": "Scroll down to the episodes section"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode from the episodes list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the player shows a video area and playback controls"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Video player page loads and initializes playback UI",
+    "description": "Verifies the player can be reached from the home page and displays playable video content.",
+    "category": "Video Player",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the video player is displayed and ready for playback"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Play, change quality, seek, fullscreen, and go to next episode",
+    "description": "Verifies the core end-to-end playback controls and episode navigation work from the player UI.",
+    "category": "Video Player",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Start video playback"
+      },
+      {
+        "type": "action",
+        "description": "Open quality settings and select a different available quality"
+      },
+      {
+        "type": "action",
+        "description": "Seek forward on the video timeline"
+      },
+      {
+        "type": "action",
+        "description": "Toggle fullscreen mode"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the next episode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify playback is working on the newly opened episode"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Pause and resume continues playback",
+    "description": "Verifies pausing and resuming playback works and the video continues from the paused position.",
+    "category": "Video Player",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Start video playback"
+      },
+      {
+        "type": "action",
+        "description": "Wait for a short time for playback to progress"
+      },
+      {
+        "type": "action",
+        "description": "Pause video playback"
+      },
+      {
+        "type": "action",
+        "description": "Resume video playback"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the video is playing and progresses after resuming"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Navigate between next and previous episode from player",
+    "description": "Verifies episode navigation controls allow moving forward and back between episodes.",
+    "category": "Video Player",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the next episode"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the previous episode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the player updates to the previous episode and playback UI remains functional"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Quality selection persists for current session during navigation within player",
+    "description": "Verifies selecting a quality remains applied when moving to the next episode within the player.",
+    "category": "Video Player",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Open quality settings and select a specific available quality"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the next episode"
+      },
+      {
+        "type": "action",
+        "description": "Open quality settings"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the previously selected quality is still selected or the player indicates an active quality selection"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Retry control is available when playback fails to start",
+    "description": "Verifies that when playback cannot start, the UI shows an error state with a retry option.",
+    "category": "Video Player",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the player to attempt loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that if a playback error is shown, a retry loading control is available"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Retry loading stream returns to normal player state",
+    "description": "Verifies that using retry from the player error state attempts to load again and returns to playback-ready UI when successful.",
+    "category": "Video Player",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click an anime item from a row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click an episode to start watching"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the player to attempt loading"
+      },
+      {
+        "type": "action",
+        "description": "If a playback error is shown, trigger retry loading stream"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the player returns to a playback-ready state or begins playback"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Redirect unauthenticated user from Watch History",
+    "description": "Ensures unauthenticated users cannot access watch history and are prompted to authenticate or redirected.",
+    "category": "Watch History",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /history"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is prompted to authenticate or is redirected to a login entry point"
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Watch History loads for authenticated user and shows continue watching",
+    "description": "Verifies that an authenticated user can load the Watch History page and see a continue-watching section.",
+    "category": "Watch History",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open watch history"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a continue-watching section is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Resume watching from continue-watching item",
+    "description": "Validates that selecting a continue-watching item navigates to the player and resumes from the saved position.",
+    "category": "Watch History",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open watch history"
+      },
+      {
+        "type": "action",
+        "description": "Select a continue-watching item to resume"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the video player is displayed and playback resumes from a non-zero position"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Watch progress is visible per episode in history list",
+    "description": "Ensures the watch history UI displays progress information per episode for items shown.",
+    "category": "Watch History",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open watch history"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one history item shows watch progress information"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Continue-watching item opens correct episode details in player UI",
+    "description": "Checks that resuming from history opens a specific episode context in the player (not just a generic page).",
+    "category": "Watch History",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open watch history"
+      },
+      {
+        "type": "action",
+        "description": "Select a continue-watching item to resume"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the player shows episode context (such as an episode number/title) for the selected item"
+      }
+    ]
+  }
+]

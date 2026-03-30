@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "frontend",
+  "localEndpoint": "http://localhost:5173/",
+  "serverPort": 59295,
+  "executionArgs": {
+    "projectName": "jikan-frontend",
+    "projectPath": "D:\\CURSOR\\javascript.html\\python\\real world projects\\ANIME SPP\\jikan-frontend",
+    "testIds": [],
+    "additionalInstruction": "",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-ogvp5GrGZ8n0tAGqLPHDFivFIIZnCCmumu8xWc71glt6csZke4WwBO6tGRF7igorBP01uBkZmnvcbD43sTZpLXw3rFSrlJ8oi25hZep_JU-ljeUXmmDOLlSkDUUnxCuxC70"
+    }
+  },
+  "proxy": "http://f83bcaff-98e5-4be0-a00c-7327efd1eb10:0lU2OdMndddDiFvtes5ocamdsr77l67b@tun.testsprite.com:8080"
+}

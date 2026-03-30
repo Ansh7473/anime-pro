@@ -239,60 +239,108 @@ const Player = () => {
     setEpisodeId(stateEpisodeId || targetEp?.id || `${animeId}-${ep}`);
   }, [animeId, ep, allEpisodes, location.state]);
 
+  const currentRequestRef = useRef<number>(0);
+
   useEffect(() => {
     if (!episodeId || !animeId) return;
     
-    // Guard: Prevent redundant requests for the same episode
-    const requestKey = `${animeId}-${ep}-${episodeId}`;
-    if (lastRequestRef.current === requestKey) return;
+    // Guard: Unique key for this specific stream configuration
+    const requestKey = `SOURCES-${animeId}-${ep}-${episodeId}`;
+    
+    // If we ALREADY have a successful stream for this EXACT key, DON'T FETCH AGAIN
+    if (lastRequestRef.current === requestKey && streamUrl && !error) {
+      console.log('[Player] Stream already loaded for this episode, skipping redundant fetch.');
+      return;
+    }
+
+    const requestId = ++currentRequestRef.current;
     lastRequestRef.current = requestKey;
 
     setLoadingStream(true);
     setError('');
-    // Reset sources so the new episode starts fresh
-    setAllSources([]);
+    
+    setLoadingStream(true);
+    setError('');
+    
+    console.log(`[Player] Fetching parallel sources for ID: ${requestId}, Key: ${requestKey}`);
 
-    animeAPI.getWatch(episodeId, animeId, ep)
-      .then(res => {
-        const streamingData = res.data?.data;
-        let sources: any[] = [];
+    // Track if any provider has succeeded to stop global loading spinner
+    let anySuccess = false;
 
-        if (streamingData && streamingData.sources) {
-          sources = streamingData.sources.map((source: any, index: number) => ({
-            name: source.name || `Stream ${index + 1}`,
-            url: source.url,
-            category: source.category || 'sub',
-            isEmbed: !source.isM3U8,
-            quality: source.quality || 'auto',
-            isM3U8: source.isM3U8 || false,
-            isDASH: source.isDASH || false,
-            provider: source.provider || 'Unknown',
-            language: source.language || (source.category === 'hindi' ? 'Hindi' : (source.category === 'dub' ? 'English' : 'Japanese'))
-          }));
-        }
+    const handleProviderResponse = (res: any, providerName: string) => {
+      if (requestId !== currentRequestRef.current) return;
 
-        setAllSources(sources);
-        if (res.data?.provider) setProvidersUsed(res.data.provider);
+      const streamingData = res.data?.data;
+      if (streamingData && streamingData.sources && streamingData.sources.length > 0) {
+        const newSources = streamingData.sources.map((source: any, index: number) => ({
+          name: source.name || `${providerName} ${index + 1}`,
+          url: source.url,
+          category: source.category || 'sub',
+          isEmbed: source.isEmbed || source.type === 'iframe' || !source.url.includes('.m3u8'),
+          quality: source.quality || 'auto',
+          isM3U8: source.isM3U8 || source.url.includes('.m3u8') || false,
+          isDASH: source.isDASH || false,
+          provider: source.provider || providerName,
+          language: source.language || (source.category === 'hindi' ? 'Hindi' : (source.category === 'dub' ? 'English' : 'Japanese'))
+        }));
 
-        // Auto-select best source: prefer current category, then dub, then any
-        const preferred = sources.filter(s => s.category?.toLowerCase() === category.toLowerCase());
-        const selected = preferred.length ? preferred[0] : sources[0];
+        setAllSources(prev => {
+          // Filter out duplicates if any (by URL)
+          const existingUrls = new Set(prev.map(s => s.url));
+          const filteredNew = newSources.filter((s: any) => !existingUrls.has(s.url));
+          const combined = [...prev, ...filteredNew];
+          
+          // Auto-select first source if nothing is selected yet
+          if (!anySuccess && combined.length > 0) {
+            const preferred = combined.filter(s => s.category?.toLowerCase() === category.toLowerCase());
+            const selected = preferred.length ? preferred[0] : combined[0];
+            
+            if (selected) {
+              setActiveServer(selected.name);
+              setStreamUrl(selected.url);
+              setIsEmbed(selected.isEmbed);
+            }
+          }
+          return combined;
+        });
 
-        if (selected) {
-          setCategory(selected.category?.toLowerCase() as Category || 'dub');
-          setActiveServer(selected.name);
-          setStreamUrl(selected.url);
-          setIsEmbed(selected.isEmbed || !selected.url.includes('.m3u8'));
+        if (!anySuccess) {
+          anySuccess = true;
+          setLoadingStream(false);
+          setProvidersUsed(provider => provider ? `${provider}, ${providerName}` : providerName);
         } else {
-          setError('No sources found for this episode.');
+          setProvidersUsed(provider => provider.includes(providerName) ? provider : `${provider}, ${providerName}`);
         }
-      })
-      .catch(err => {
-        console.error('Watch fetch failed', err);
-        setError('Failed to load stream. Please try a different server or language.');
-      })
-      .finally(() => setLoadingStream(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      }
+    };
+
+    // Reset sources for new episode
+    setAllSources([]);
+    setProvidersUsed('');
+
+    // Fire all 3 providers in parallel
+    const providers = [
+      { name: 'Animelok', fn: () => animeAPI.getWatchAnimelok(episodeId, animeId, ep) },
+      { name: 'DesiDub', fn: () => animeAPI.getWatchDesiDub(episodeId, animeId, ep) },
+      { name: 'AHD', fn: () => animeAPI.getWatchAHD(episodeId, animeId, ep) }
+    ];
+
+    let completedCount = 0;
+    providers.forEach(p => {
+      p.fn()
+        .then(res => handleProviderResponse(res, p.name))
+        .catch(err => console.error(`[Player] ${p.name} fetch failed:`, err))
+        .finally(() => {
+          if (requestId !== currentRequestRef.current) return;
+          completedCount++;
+          if (completedCount === providers.length) {
+            setLoadingStream(false);
+            if (!anySuccess) {
+              setError('No sources found for this episode across all providers.');
+            }
+          }
+        });
+    });
   }, [episodeId, animeId, ep]); // NOTE: `category` intentionally omitted
 
   // Log to watch history when stream starts

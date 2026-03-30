@@ -1,0 +1,186 @@
+version: "2"
+type: frontend
+tech_stack:
+  - React 19
+  - TypeScript
+  - Vite
+  - Framer Motion
+  - React Router DOM
+  - Supabase
+  - HLS.js
+  - Axios
+routes:
+  - path: /
+    file: src/pages/Home.tsx
+    auth_required: false
+    description: Home page with hero banner and anime rows
+  - path: /latest
+    file: src/pages/LatestEpisodes.tsx
+    auth_required: false
+    description: Latest anime episodes page
+  - path: /tv-series
+    file: src/pages/TVShows.tsx
+    auth_required: false
+    description: TV series anime listing page
+  - path: /movies
+    file: src/pages/Movies.tsx
+    auth_required: false
+    description: Anime movies listing page
+  - path: /schedule
+    file: src/pages/Schedule.tsx
+    auth_required: false
+    description: Anime release schedule page
+  - path: /search
+    file: src/pages/Search.tsx
+    auth_required: false
+    description: Anime search page with filters
+  - path: /anime/:id
+    file: src/pages/AnimeDetails.tsx
+    auth_required: false
+    description: Anime details page with synopsis, characters, episodes
+  - path: /watch/:animeId/:ep
+    file: src/pages/Player.tsx
+    auth_required: false
+    description: Video player page with HLS streaming
+  - path: /auth/callback
+    file: src/pages/AuthCallback.tsx
+    auth_required: false
+    description: OAuth authentication callback handler
+  - path: /favorites
+    file: src/components/Favorites.tsx
+    auth_required: true
+    description: User favorites management page
+  - path: /history
+    file: src/components/WatchHistory.tsx
+    auth_required: true
+    description: User watch history page
+features:
+  - name: Browse Anime Content
+    description: Users can browse anime content by categories (latest, TV series, movies, schedule)
+    files:
+      - src/pages/Home.tsx
+      - src/pages/LatestEpisodes.tsx
+      - src/pages/TVShows.tsx
+      - src/pages/Movies.tsx
+      - src/pages/Schedule.tsx
+      - src/components/Row.tsx
+      - src/components/AnimeCard.tsx
+      - src/components/HeroBanner.tsx
+    entry_route: /
+    user_interactions:
+      - Navigate to different categories via navbar
+      - Scroll through anime rows
+      - Click on anime card to view details
+      - Hover on anime card for quick view
+    api_calls:
+      - method: GET
+        endpoint: /api/jikan/topanime
+      - method: GET
+        endpoint: /api/jikan/recent
+      - method: GET
+        endpoint: /api/jikan/anime
+    auth_required: false
+  - name: Search Anime
+    description: Users can search for anime with filters
+    files:
+      - src/pages/Search.tsx
+      - src/api/client.ts
+    entry_route: /search
+    user_interactions:
+      - Type search query in search bar
+      - Apply genre/type/year filters
+      - View search results
+      - Click on result to view details
+    api_calls:
+      - method: GET
+        endpoint: /api/jikan/anime (with query params)
+    auth_required: false
+  - name: View Anime Details
+    description: Users can view detailed anime information including synopsis, characters, and episodes
+    files:
+      - src/pages/AnimeDetails.tsx
+      - src/components/QuickViewModal.tsx
+    entry_route: /anime/:id
+    user_interactions:
+      - View anime synopsis and metadata
+      - Browse episodes list
+      - Click episode to watch
+      - Quick view modal on hover
+    api_calls:
+      - method: GET
+        endpoint: /api/jikan/anime/:id
+      - method: GET
+        endpoint: /api/jikan/anime/:id/characters
+      - method: GET
+        endpoint: /api/jikan/anime/:id/episodes
+    auth_required: false
+  - name: Video Player
+    description: Users can stream anime episodes with adaptive bitrate
+    files:
+      - src/pages/Player.tsx
+      - src/api/client.ts
+    entry_route: /watch/:animeId/:ep
+    user_interactions:
+      - Play/pause video
+      - Change video quality
+      - Seek video timeline
+      - Toggle fullscreen
+      - Go to next/previous episode
+    api_calls:
+      - method: GET
+        endpoint: /api/stream/:provider/:animeId
+    auth_required: false
+  - name: User Authentication
+    description: Users can sign in via OAuth (Google, GitHub)
+    files:
+      - src/pages/AuthCallback.tsx
+      - src/contexts/AuthContext.tsx
+      - src/lib/supabase.ts
+    entry_route: /auth/callback
+    user_interactions:
+      - Click login button
+      - Redirect to OAuth provider
+      - Handle callback and session
+    api_calls:
+      - method: GET
+        endpoint: /api/auth/callback
+    auth_required: false
+  - name: Favorites Management
+    description: Authenticated users can save and manage favorite anime
+    files:
+      - src/components/Favorites.tsx
+      - src/hooks/useFavorites.ts
+      - src/lib/supabase.ts
+    entry_route: /favorites
+    user_interactions:
+      - Click heart icon to add/remove favorite
+      - View favorites list
+      - Click favorite to view details
+    api_calls:
+      - method: GET
+        endpoint: Supabase DB query
+      - method: POST
+        endpoint: Supabase DB insert
+      - method: DELETE
+        endpoint: Supabase DB delete
+    auth_required: true
+  - name: Watch History
+    description: Authenticated users can track their watch progress
+    files:
+      - src/components/WatchHistory.tsx
+      - src/hooks/useWatchHistory.ts
+      - src/lib/supabase.ts
+    entry_route: /history
+    user_interactions:
+      - View continue watching section
+      - See watch progress per episode
+      - Resume watching from last position
+    api_calls:
+      - method: GET
+        endpoint: Supabase DB query
+      - method: POST
+        endpoint: Supabase DB insert
+      - method: PUT
+        endpoint: Supabase DB update
+    auth_required: true
+known_limitations: []

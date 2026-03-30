@@ -242,6 +242,18 @@ export const jikanAPI = {
     return await streamingClient.get('/sources', { params: { episodeId, animeId, ep: episodeNumber } });
   },
 
+  getWatchAnimelok: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
+    return await streamingClient.get('/sources/animelok', { params: { episodeId, animeId, ep: episodeNumber } });
+  },
+
+  getWatchDesiDub: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
+    return await streamingClient.get('/sources/desidub', { params: { episodeId, animeId, ep: episodeNumber } });
+  },
+
+  getWatchAHD: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
+    return await streamingClient.get('/sources/ahd', { params: { episodeId, animeId, ep: episodeNumber } });
+  },
+
   getStreamingServers: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
     return await streamingClient.get('/servers', { params: { episodeId, animeId, ep: episodeNumber } });
   },
