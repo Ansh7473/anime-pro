@@ -93,7 +93,7 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     if (!key) throw new Error("No ScraperAPI key");
     try {
       const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
-      const res = await fetchWithTimeout(scraperUrl, { method: "GET" }, 20000);
+      const res = await fetchWithTimeout(scraperUrl, { method: "GET" }, 30000);
       if (!res.ok) throw new Error(`ScraperAPI ${res.status}`);
       const body = await res.clone().text().catch(() => "");
       if (body.includes("Just a moment") || body.includes("cf-browser-verification")) {
