@@ -29,13 +29,34 @@ async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1000
   }
 }
 
+const fetchWithTimeout = async (url: string, timeout: number = 6000, options: any = {}) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+};
+
+const withTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> => {
+  return Promise.race([
+    fn(),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallbackValue), timeoutMs))
+  ]);
+};
+
 // Helper: Get titles from Jikan
 async function getAnimeTitles(malId: string): Promise<string[]> {
   if (titleCache.has(malId)) {
     return JSON.parse(titleCache.get(malId)!);
   }
   try {
-    const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}`);
+    // Jikan is slow, 4s timeout
+    const res = await fetchWithTimeout(`https://api.jikan.moe/v4/anime/${malId}`, 4000);
     if (res.ok) {
       const data = (await res.json()) as any;
       const titles: string[] = [];
@@ -120,27 +141,27 @@ streamingRouter.get("/sources/desidub", async (c) => {
   const ep = parseInt(c.req.query("ep") || "1");
   const malId = animeId || "unknown";
 
-  const titles = await getAnimeTitles(malId);
-  if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
-
   try {
-    const desidubData = await fetchWithRetry(async () => {
-      for (const title of titles) {
-        const normalizedTitle = title.toLowerCase().trim();
-        let knownSlug = null;
-        if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
-        else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
-        else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
-        else if (normalizedTitle.includes('attack on titan')) knownSlug = 'attack-on-titan';
-        else if (normalizedTitle.includes('demon slayer')) knownSlug = 'demon-slayer';
-        else if (normalizedTitle.includes('my hero')) knownSlug = 'my-hero-academia';
-        else if (normalizedTitle === 'death note') knownSlug = 'death-note';
-        else if (normalizedTitle.includes('dragon ball')) knownSlug = 'dragon-ball';
-        else if (normalizedTitle.includes('fairy tail')) knownSlug = 'fairy-tail';
-        else if (normalizedTitle.includes('hunter x hunter')) knownSlug = 'hunter-x-hunter';
+    const titles = await getAnimeTitles(malId);
+    if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
 
-        if (knownSlug) {
-          const desidubSources = await (async () => {
+    return await withTimeout(async () => {
+      try {
+        const desidubData = await Promise.any(titles.map(async (title) => {
+          const normalizedTitle = title.toLowerCase().trim();
+          let knownSlug = null;
+          if (normalizedTitle.includes('jujutsu kaisen')) knownSlug = 'jujutsu-kaisen-season-3';
+          else if (normalizedTitle.includes('naruto')) knownSlug = 'naruto';
+          else if (normalizedTitle.includes('one piece')) knownSlug = 'one-piece';
+          else if (normalizedTitle.includes('attack on titan')) knownSlug = 'attack-on-titan';
+          else if (normalizedTitle.includes('demon slayer')) knownSlug = 'demon-slayer';
+          else if (normalizedTitle.includes('my hero')) knownSlug = 'my-hero-academia';
+          else if (normalizedTitle === 'death note') knownSlug = 'death-note';
+          else if (normalizedTitle.includes('dragon ball')) knownSlug = 'dragon-ball';
+          else if (normalizedTitle.includes('fairy tail')) knownSlug = 'fairy-tail';
+          else if (normalizedTitle.includes('hunter x hunter')) knownSlug = 'hunter-x-hunter';
+
+          if (knownSlug) {
             if (knownSlug === "jujutsu-kaisen-season-3" && ep === 1) {
               const res = await getDesiDubSources("jujutsu-kaisen-shimetsu-kaiyuu-zenpen-3rd-season-episode-48");
               if (res && res.length > 0) return res;
@@ -156,28 +177,28 @@ streamingRouter.get("/sources/desidub", async (c) => {
             }
             const directRes = await getDesiDubSources(`${knownSlug}-episode-${ep}`);
             if (directRes && directRes.length > 0) return directRes;
-            return null;
-          })();
-          if (desidubSources) return desidubSources;
-        }
-      }
-      return null;
-    });
+          }
+          throw new Error('Not found');
+        }));
 
-    if (desidubData && desidubData.length > 0) {
-      return c.json({
-        provider: "DesiDubAnime",
-        status: 200,
-        data: {
-          sources: desidubData.map((s: any) => ({ ...s, provider: "DesiDubAnime" })),
-          subtitles: []
-        },
-      });
-    }
+        if (desidubData && desidubData.length > 0) {
+          return c.json({
+            provider: "DesiDubAnime",
+            status: 200,
+            data: {
+              sources: desidubData.map((s: any) => ({ ...s, provider: "DesiDubAnime" })),
+              subtitles: []
+            },
+          });
+        }
+      } catch (e) {
+        // All titles failed
+      }
+      return c.json({ provider: "DesiDubAnime", status: 404, message: "No sources found" }, 404);
+    }, 8000, c.json({ provider: "DesiDubAnime", status: 404, message: "Request timed out" }, 404));
   } catch (e) {
-    console.log("[Streaming] DesiDub route error:", e);
+    return c.json({ provider: "DesiDubAnime", status: 404, message: "Error" }, 404);
   }
-  return c.json({ provider: "DesiDubAnime", status: 404, message: "No sources found" }, 404);
 });
 
 // 3. AnimeHindiDubbed-WP Provider Route
@@ -186,36 +207,40 @@ streamingRouter.get("/sources/ahd", async (c) => {
   const ep = parseInt(c.req.query("ep") || "1");
   const malId = animeId || "unknown";
 
-  const titles = await getAnimeTitles(malId);
-  if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
-
   try {
-    const ahdData = await fetchWithRetry(async () => {
-      for (const title of titles) {
-        const results = await searchAnimeHindiDubbedWP(title);
-        if (results.length > 0) {
-          const match = results.find(r => r.title.rendered.toLowerCase().includes(title.toLowerCase())) || results[0];
-          const sources = await getAnimeHindiDubbedAllSourcesWP(match.id, ep);
-          if (sources.length > 0) return sources;
-        }
-      }
-      return null;
-    });
+    const titles = await getAnimeTitles(malId);
+    if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
 
-    if (ahdData && ahdData.length > 0) {
-      return c.json({
-        provider: "AnimeHindiDubbed-WP",
-        status: 200,
-        data: {
-          sources: ahdData.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })),
-          subtitles: []
-        },
-      });
-    }
+    return await withTimeout(async () => {
+      try {
+        const ahdData = await Promise.any(titles.map(async (title) => {
+          const results = await searchAnimeHindiDubbedWP(title);
+          if (results.length > 0) {
+            const match = results.find(r => r.title.rendered.toLowerCase().includes(title.toLowerCase())) || results[0];
+            const sources = await getAnimeHindiDubbedAllSourcesWP(match.id, ep);
+            if (sources.length > 0) return sources;
+          }
+          throw new Error('Not found');
+        }));
+
+        if (ahdData && ahdData.length > 0) {
+          return c.json({
+            provider: "AnimeHindiDubbed-WP",
+            status: 200,
+            data: {
+              sources: ahdData.map((s: any) => ({ ...s, provider: "AnimeHindiDubbed-WP" })),
+              subtitles: []
+            },
+          });
+        }
+      } catch (e) {
+        // All titles failed
+      }
+      return c.json({ provider: "AnimeHindiDubbed-WP", status: 404, message: "No sources found" }, 404);
+    }, 8000, c.json({ provider: "AnimeHindiDubbed-WP", status: 404, message: "Request timed out" }, 404));
   } catch (e) {
-    console.log("[Streaming] AHD route error:", e);
+    return c.json({ provider: "AnimeHindiDubbed-WP", status: 404, message: "Error" }, 404);
   }
-  return c.json({ provider: "AnimeHindiDubbed-WP", status: 404, message: "No sources found" }, 404);
 });
 
 // Main Aggregated Sources Endpoint (Optional fallback)
