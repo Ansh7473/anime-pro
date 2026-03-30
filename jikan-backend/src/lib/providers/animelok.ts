@@ -27,9 +27,9 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 // ScraperAPI bypasses Cloudflare IUAM ("Just a moment..." page) which blocks datacenter IPs
 // Rotate across 3 keys = 15,000 free requests/month total
 const SCRAPER_API_KEYS = [
-  process.env.SCRAPER_API_KEY_1 || "",
-  process.env.SCRAPER_API_KEY_2 || "",
-  process.env.SCRAPER_API_KEY_3 || "",
+  process.env.SCRAPER_API_KEY_1 || "6b80a78e7bb23b0cf32a9c6dd7a06c47",
+  process.env.SCRAPER_API_KEY_2 || "c0334020e02d6bd704f16647faa5b5f0",
+  process.env.SCRAPER_API_KEY_3 || "abecc6c40c322858d4e462a3c072cab6",
 ].filter(k => k.length > 0);
 
 let scraperKeyIndex = 0;
@@ -43,7 +43,7 @@ const getNextScraperKey = () => {
 const fetchWithProxy = async (url: string, options: any = {}) => {
   // Track 1: Direct fetch (works on localhost, blocked on cloud servers by Cloudflare)
   const directTrack = async () => {
-    const res = await fetchWithTimeout(url, options, 3000); 
+    const res = await fetchWithTimeout(url, options, 3000);
     if (res.status === 403 || res.status === 503) {
       const body = await res.clone().text().catch(() => "");
       if (body.includes("Just a moment") || body.includes("Cloudflare")) {
@@ -59,11 +59,11 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     await new Promise(r => setTimeout(r, 300));
     const key = getNextScraperKey();
     if (!key) throw new Error("No ScraperAPI key configured");
-    
+
     const scraperUrl = `http://api.scraperapi.com?api_key=${key}&url=${encodeURIComponent(url)}&render=true`;
     const scraperOptions: any = { method: options.method || "GET" };
     if (options.body) scraperOptions.body = options.body;
-    
+
     const res = await fetchWithTimeout(scraperUrl, scraperOptions, 25000);
     if (!res.ok) {
       console.warn(`[Animelok ScraperAPI] ${res.status} for ${url}`);
