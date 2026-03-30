@@ -40,18 +40,32 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   const proxyTrack = async () => {
     // 500ms delay to favor direct fetches
     await new Promise(r => setTimeout(r, 500)); 
+    
+    // Hardened browser-like headers for proxy track to bypass detection
     const proxyOptions = {
       ...options,
       headers: {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://animelok.xyz/",
+        "Sec-Ch-Ua": '"Chromium";v="125", "Not.A/Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "cross-site",
         ...options.headers,
         "x-corsfix-key": API_KEY,
       }
     };
+
     const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
     if (!res.ok) {
-       // Debugging: Log the status code to see if it's 403 (corsfix blocked) or 404 (target not found)
-       const body = await res.text().catch(() => "N/A");
-       console.log(`[Animelok Proxy Error] Status: ${res.status} URL: ${url} Body: ${body.substring(0, 100)}`);
+       // Debugging: Log the status code using clone to preserve stream
+       const resClone = res.clone();
+       const body = await resClone.text().catch(() => "N/A");
+       console.log(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
        if (res.status !== 404) throw new Error(`Proxy failed: ${res.status}`);
     }
     return res;
