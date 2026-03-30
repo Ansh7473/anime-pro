@@ -64,7 +64,7 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     const scraperOptions: any = { method: options.method || "GET" };
     if (options.body) scraperOptions.body = options.body;
     
-    const res = await fetchWithTimeout(scraperUrl, scraperOptions, 15000);
+    const res = await fetchWithTimeout(scraperUrl, scraperOptions, 25000);
     if (!res.ok) {
       console.warn(`[Animelok ScraperAPI] ${res.status} for ${url}`);
       throw new Error(`ScraperAPI failed: ${res.status}`);
