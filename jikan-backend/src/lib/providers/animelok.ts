@@ -9,7 +9,7 @@ const ANIMELOK_HEADERS = {
 const anilistCache = new Map<string, string>();
 
 /**
- * Racing Proxy Implementation for Animelok (Vercel Fix)
+ * Racing Proxy Implementation for Animelok (Vercel Fixs)
  */
 const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) => {
   const controller = new AbortController();
