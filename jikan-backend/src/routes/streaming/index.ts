@@ -195,7 +195,7 @@ streamingRouter.get("/sources/desidub", async (c) => {
         // All titles failed
       }
       return c.json({ provider: "DesiDubAnime", status: 404, message: "No sources found" }, 404);
-    }, 8000, c.json({ provider: "DesiDubAnime", status: 404, message: "Request timed out" }, 404));
+    }, 9500, c.json({ provider: "DesiDubAnime", status: 404, message: "Request timed out" }, 404));
   } catch (e) {
     return c.json({ provider: "DesiDubAnime", status: 404, message: "Error" }, 404);
   }
