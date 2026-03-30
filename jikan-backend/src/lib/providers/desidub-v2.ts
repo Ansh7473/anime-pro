@@ -51,25 +51,24 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
   }
 };
 
-// CORS Proxy implementation using the provided API key (assume CORS.SH format)
+// CORS Proxy implementation using the provided API key (Racing Strategy)
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "987d90d7";
   const proxyUrl = `https://proxy.cors.sh/${url}`;
 
-  try {
-    // Attempt 1: Direct Fetch (Faster, 4s timeout)
-    console.log(`[DesiDub] Direct attempt: ${url}`);
-    const res = await fetchWithTimeout(url, options, 4000);
-    
-    // If Cloudflare blocks us (403), move to proxy immediately
+  const directTrack = async () => {
+    console.log(`[DesiDub] Racing Direct: ${url}`);
+    const res = await fetchWithTimeout(url, options, 3500);
     if (res.status === 403 || res.status === 503) {
-      throw new Error(`Direct block: ${res.status}`);
+      throw new Error("Direct blocked");
     }
-    
     return res;
-  } catch (e) {
-    // Attempt 2: Proxy Fallback
-    console.log(`[DesiDub] Retrying via CORS Proxy: ${url}`);
+  };
+
+  const proxyTrack = async () => {
+    // Subtle delay to favor direct if it's fast
+    await new Promise(r => setTimeout(r, 800)); 
+    console.log(`[DesiDub] Racing Proxy: ${url}`);
     const proxyOptions = {
       ...options,
       headers: {
@@ -77,9 +76,22 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
         "x-cors-api-key": API_KEY,
       }
     };
-    
-    // Primary Proxy: CORS.SH
-    return await fetchWithTimeout(proxyUrl, proxyOptions, 6000);
+    const res = await fetchWithTimeout(proxyUrl, proxyOptions, 6500);
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`Proxy failed: ${res.status}`);
+    }
+    return res;
+  };
+
+  try {
+    // Race both tracks. First valid response wins.
+    return await Promise.any([directTrack(), proxyTrack()]);
+  } catch (e) {
+    console.error(`[DesiDub] Both tracks failed for ${url}`);
+    // If both fail, try one last desperate direct fetch to get whatever status code is there
+    return await fetchWithTimeout(url, options, 2000).catch(err => {
+        throw new Error("Network saturation/Total failure");
+    });
   }
 };
 
