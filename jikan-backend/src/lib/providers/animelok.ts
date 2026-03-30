@@ -51,7 +51,7 @@ let fsSessionWarmExpiry = 0;
 const warmFlareSolverrSession = async (): Promise<void> => {
   if (fsSessionWarmed && Date.now() < fsSessionWarmExpiry) return;
 
-  console.info("[Animelok] Warming FlareSolverr session with homepage visit...");
+  console.info("[Animelok] Warming FlareSolverr session with watch page visit...");
   // Create session (ignore error if it already exists)
   await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
@@ -59,29 +59,52 @@ const warmFlareSolverrSession = async (): Promise<void> => {
     body: JSON.stringify({ cmd: "sessions.create", session: FS_SESSION }),
   }, 10000).catch(() => {});
 
-  // Visit homepage in session → CF clearance stored in session's Chromium
-  const homeRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+  // Visit the homepage first (CF bypass)
+  await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz", session: FS_SESSION, maxTimeout: 30000 }),
+  }, 35000).catch(() => {});
+
+  // Also visit a watch page — this sets the proper Referer context the API needs
+  const watchRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz/watch/one-piece-episode-1", session: FS_SESSION, maxTimeout: 30000 }),
   }, 35000);
-  if (!homeRes.ok) throw new Error(`FlareSolverr session homepage HTTP ${homeRes.status}`);
-  const homeData = (await homeRes.json()) as any;
-  if (homeData.status !== "ok") throw new Error(`FlareSolverr session: ${homeData.message}`);
+  if (!watchRes.ok) throw new Error(`FlareSolverr watch page HTTP ${watchRes.status}`);
+  const watchData = (await watchRes.json()) as any;
+  if (watchData.status !== "ok") throw new Error(`FlareSolverr watch: ${watchData.message}`);
 
   fsSessionWarmed = true;
   fsSessionWarmExpiry = Date.now() + 22 * 60 * 60 * 1000;
-  console.info("[Animelok] FlareSolverr session warmed — CF clearance active");
+  console.info("[Animelok] FlareSolverr session warmed — watch page Referer context active");
 };
 
 const flaresolverrFetch = async (url: string): Promise<Response> => {
   if (!FLARESOLVERR_URL) throw new Error("No FlareSolverr URL set — add FLARESOLVERR_URL env var");
   await warmFlareSolverrSession();
 
+  // Extract slug from URL for Referer (e.g. one-piece-21 → /watch/one-piece-episode-1)
+  // The API checks Referer header to validate the request comes from their watch page
+  const slugMatch = url.match(/\/api\/anime\/([^\/]+)\//);
+  const slug = slugMatch?.[1] || "one-piece-21";
+  const referer = `https://animelok.xyz/watch/${slug}-episode-1`;
+
   const fsRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd: "request.get", url, session: FS_SESSION, maxTimeout: 30000 }),
+    body: JSON.stringify({
+      cmd: "request.get",
+      url,
+      session: FS_SESSION,
+      maxTimeout: 30000,
+      headers: {
+        Referer: referer,
+        Origin: "https://animelok.xyz",
+        "Accept": "application/json, text/plain, */*",
+      },
+    }),
   }, 35000);
 
   if (!fsRes.ok) throw new Error(`FlareSolverr HTTP ${fsRes.status}`);
@@ -89,13 +112,14 @@ const flaresolverrFetch = async (url: string): Promise<Response> => {
   if (data.status !== "ok" || !data.solution?.response) throw new Error(`FlareSolverr: ${data.status} - ${data.message}`);
 
   let responseText = data.solution.response as string;
+  console.info(`[Animelok] FlareSolverr raw preview (${responseText.length}): ${responseText.slice(0, 100)}`);
+
   // Chrome's JSON viewer wraps JSON in: <html><body><pre>{"json":"here"}</pre></body></html>
   if (responseText.trim().startsWith("<")) {
     const preMatch = responseText.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
     if (preMatch?.[1]) {
       responseText = preMatch[1].trim();
     } else {
-      // Session might have expired, reset warming flag
       fsSessionWarmed = false;
       throw new Error("FlareSolverr returned unrecognized HTML — resetting session");
     }
