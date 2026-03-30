@@ -26,8 +26,8 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  // Updated format: some proxies work better with ?https://... than ?url=...
-  const proxyUrl = `https://proxy.corsfix.com/?${url}`;
+  // Encode target URL before sending to proxy
+  const proxyUrl = `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`;
 
   const directTrack = async () => {
     const res = await fetchWithTimeout(url, options, 3000); 
@@ -38,7 +38,7 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   };
 
   const proxyTrack = async () => {
-    // Wait for the 500ms delay to favor direct fetches
+    // 500ms delay to favor direct fetches
     await new Promise(r => setTimeout(r, 500)); 
     const proxyOptions = {
       ...options,
@@ -49,9 +49,9 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     };
     const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
     if (!res.ok) {
-       // Debugging for Vercel: Log the first 100 chars of the error body
+       // Debugging: Log the status code to see if it's 403 (corsfix blocked) or 404 (target not found)
        const body = await res.text().catch(() => "N/A");
-       console.log(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
+       console.log(`[Animelok Proxy Error] Status: ${res.status} URL: ${url} Body: ${body.substring(0, 100)}`);
        if (res.status !== 404) throw new Error(`Proxy failed: ${res.status}`);
     }
     return res;
@@ -61,8 +61,8 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
     const result = await Promise.any([directTrack(), proxyTrack()]);
     console.log(`[Animelok] Success for ${url}`);
     return result;
-  } catch (e) {
-    console.error(`[Animelok] Total failure for ${url}`);
+  } catch (e: any) {
+    console.error(`[Animelok] Total failure for ${url}: ${e.message}`);
     // If both failed, attempt one last desperate direct fetch to see the raw response
     return await fetchWithTimeout(url, options, 2000).catch(() => {
         throw new Error("Network saturation/Total failure");
