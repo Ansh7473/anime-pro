@@ -86,11 +86,21 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
       }
       const responseText = data.solution.response as string;
       console.info(`[Animelok] FlareSolverr response preview: ${responseText.slice(0, 120)}`);
+      
+      // Chrome's JSON viewer wraps JSON in: <html><body><pre ...>{"json":"here"}</pre></body></html>
+      // We need to extract the actual JSON from the <pre> tag
+      let finalText = responseText;
       if (responseText.trim().startsWith("<")) {
-        throw new Error("FlareSolverr returned HTML — API rejected browser headers");
+        const preMatch = responseText.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+        if (preMatch && preMatch[1]) {
+          finalText = preMatch[1].trim();
+          console.info(`[Animelok] FlareSolverr extracted JSON from Chrome pre-wrapper (${finalText.length} chars)`);
+        } else {
+          throw new Error("FlareSolverr returned unrecognized HTML — no <pre> tag found");
+        }
       }
       console.info(`[Animelok] FlareSolverr success for ${url}`);
-      return new Response(responseText, {
+      return new Response(finalText, {
         status: data.solution.status || 200,
         headers: { "Content-Type": "application/json" },
       });
