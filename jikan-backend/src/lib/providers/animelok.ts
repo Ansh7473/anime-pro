@@ -326,7 +326,7 @@ export async function getAnimelokSources(slug: string, ep: number) {
           } catch (e) {
             // ignore parse error if not valid json
           }
-        }
+        } 
 
         return {
           name: s.name + (s.tip ? ` (${s.tip})` : ""),
