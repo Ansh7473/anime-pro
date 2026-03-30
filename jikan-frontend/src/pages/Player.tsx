@@ -4,10 +4,11 @@ import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ArrowLeft, Play, Subtitles, Star, Heart, Share2, Info, TrendingUp, Flame } from 'lucide-react';
 import Hls from 'hls.js';
-import { animeAPI, normalize } from '../api/client';
+import { animeAPI, normalize, streamingClient } from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFavorites } from '../hooks/useFavorites';
 import { useWatchHistory } from '../hooks/useWatchHistory';
+import { getAnimelokSources, searchAnimelok } from '../lib/animelokClientFetch';
 
 const HlsPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -318,12 +319,61 @@ const Player = () => {
     setAllSources([]);
     setProvidersUsed('');
 
-    // Fire all 3 providers SEQUENTIALLY with a 1500ms gap to avoid rate limits
-    // Note: Animelok is now last as requested
+    // Fire all providers SEQUENTIALLY with a 1500ms gap to avoid rate limits
+    // Animelok now fetches from the user's BROWSER (residential IP) — bypasses Railway block
+    const epNumber = parseInt(ep || "1");
     const providers = [
       { name: 'DesiDub', fn: () => animeAPI.getWatchDesiDub(episodeId, animeId, ep) },
       { name: 'AHD', fn: () => animeAPI.getWatchAHD(episodeId, animeId, ep) },
-      { name: 'Animelok', fn: () => animeAPI.getWatchAnimelok(episodeId, animeId, ep) }
+      {
+        name: 'Animelok',
+        fn: async () => {
+          // 1. Get slug candidates from backend (pure string derivation, no API blocking)
+          const slugRes = await streamingClient.get('/animelok-slug', { params: { animeId } });
+          const slugCandidates: string[] = slugRes.data?.slugCandidates || [];
+          const titles: string[] = slugRes.data?.titles || [];
+          if (slugCandidates.length === 0 && titles.length === 0) throw new Error('No slug candidates or titles');
+
+          let bestSources: any[] = [];
+          let bestSubtitles: any[] = [];
+
+          // 2. Try direct slugs using the user browser
+          for (const slug of slugCandidates) {
+            const result = await getAnimelokSources(slug, epNumber);
+            if (result && result.sources && result.sources.length > 0) {
+              bestSources = result.sources;
+              bestSubtitles = result.subtitles || [];
+              break;
+            }
+          }
+
+          // 3. Fallback to browser search if direct slugs fail
+          if (bestSources.length === 0 && titles.length > 0) {
+            const searchResults = await searchAnimelok(titles[0]);
+            const bestMatch = searchResults.find((r: any) => 
+               titles.some(t => {
+                 const rt = (r.title || r.slug || "").toLowerCase();
+                 const tt = t.toLowerCase();
+                 return rt.includes(tt) || tt.includes(rt);
+               })
+            );
+            
+            if (bestMatch && (bestMatch.slug || bestMatch.id)) {
+               const searchSlug = bestMatch.slug || bestMatch.id;
+               const result = await getAnimelokSources(searchSlug, epNumber);
+               if (result && result.sources && result.sources.length > 0) {
+                  bestSources = result.sources;
+                  bestSubtitles = result.subtitles || [];
+               }
+            }
+          }
+
+          if (bestSources.length === 0) throw new Error('No Animelok sources found via user browser');
+
+          // Return in the standard structure
+          return { data: { data: { sources: bestSources, subtitles: bestSubtitles } } };
+        }
+      }
     ];
 
     const fetchSequentially = async () => {

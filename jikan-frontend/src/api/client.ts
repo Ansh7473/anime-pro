@@ -254,6 +254,11 @@ export const jikanAPI = {
     return await streamingClient.get('/sources/ahd', { params: { episodeId, animeId, ep: episodeNumber } });
   },
 
+  // Returns slug candidates — frontend fetches from animelok.xyz directly (user's residential IP)
+  getAnimelokSlug: async (animeId: string) => {
+    return await streamingClient.get('/animelok-slug', { params: { animeId } });
+  },
+
   getStreamingServers: async (episodeId: string, animeId?: string, episodeNumber?: string | number) => {
     return await streamingClient.get('/servers', { params: { episodeId, animeId, ep: episodeNumber } });
   },
