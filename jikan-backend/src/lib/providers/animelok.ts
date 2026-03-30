@@ -26,8 +26,8 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) 
 
 const fetchWithProxy = async (url: string, options: any = {}) => {
   const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
-  const encodedUrl = encodeURIComponent(url);
-  const proxyUrl = `https://proxy.corsfix.com/?url=${encodedUrl}`;
+  // Alignment with working Desidub format: NO encoding, just raw concat
+  const proxyUrl = `https://proxy.corsfix.com/?url=${url}`;
 
   const directTrack = async () => {
     const res = await fetchWithTimeout(url, options, 3000); 
@@ -38,10 +38,9 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   };
 
   const proxyTrack = async () => {
-    // 500ms delay to favor direct fetches
     await new Promise(r => setTimeout(r, 500)); 
     
-    // Minimalist Headers: Some environments block complex "Sec-" headers
+    // Minimalist Headers: Matches working Desidub provider
     const proxyHeaders: any = {
       "User-Agent": USER_AGENT,
       "Referer": "https://animelok.xyz/",
@@ -56,9 +55,10 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
       const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
       
       if (!res.ok) {
+         // Debugging: Log the status code using clone to preserve stream
          const resClone = res.clone();
          const body = await resClone.text().catch(() => "N/A");
-         console.log(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
+         console.warn(`[Animelok Debug] Proxy ${res.status} for ${url}: ${body.substring(0, 100)}`);
          if (res.status !== 404) throw new Error(`Proxy failed: ${res.status}`);
       }
       return res;
