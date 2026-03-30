@@ -8,6 +8,63 @@ const ANIMELOK_HEADERS = {
 
 const anilistCache = new Map<string, string>();
 
+/**
+ * Racing Proxy Implementation for Animelok (Vercel Fix)
+ */
+const fetchWithTimeout = async (url: string, options: any = {}, timeout = 4000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+};
+
+const fetchWithProxy = async (url: string, options: any = {}) => {
+  const API_KEY = "cfx_d98b6726b0533d81fc41a33e881a2a58";
+  const proxyUrl = `https://proxy.corsfix.com/?url=${url}`;
+
+  const directTrack = async () => {
+    console.log(`[Animelok] Racing Direct: ${url}`);
+    const res = await fetchWithTimeout(url, options, 3500);
+    if (res.status === 403 || res.status === 503) {
+      throw new Error("Direct blocked");
+    }
+    return res;
+  };
+
+  const proxyTrack = async () => {
+    // 500ms delay to favor direct
+    await new Promise(r => setTimeout(r, 500)); 
+    console.log(`[Animelok] Racing Corsfix: ${url}`);
+    const proxyOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        "x-corsfix-key": API_KEY,
+      }
+    };
+    const res = await fetchWithTimeout(proxyUrl, proxyOptions, 7000);
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`Proxy failed: ${res.status}`);
+    }
+    return res;
+  };
+
+  try {
+    return await Promise.any([directTrack(), proxyTrack()]);
+  } catch (e) {
+    console.error(`[Animelok] Both tracks failed for ${url}`);
+    return await fetchWithTimeout(url, options, 2000).catch(() => {
+        throw new Error("Network saturation/Total failure");
+    });
+  }
+};
+
 export async function getAnilistId(malId: string): Promise<string | null> {
   if (anilistCache.has(malId)) return anilistCache.get(malId)!;
   try {
@@ -38,7 +95,7 @@ export async function searchAnimelok(query: string) {
   try {
     // Try suggestions first
     const sUrl = `https://animelok.xyz/api/anime/search-suggestions?q=${encodeURIComponent(query)}`;
-    const sRes = await fetch(sUrl, { headers: ANIMELOK_HEADERS });
+    const sRes = await fetchWithProxy(sUrl, { headers: ANIMELOK_HEADERS });
     if (sRes.ok) {
       const data = (await sRes.json()) as any;
       if (data.results?.length > 0) return data.results;
@@ -47,7 +104,7 @@ export async function searchAnimelok(query: string) {
 
     // Main search API
     const url = `https://animelok.xyz/api/anime/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: ANIMELOK_HEADERS });
+    const res = await fetchWithProxy(url, { headers: ANIMELOK_HEADERS });
     if (res.ok) {
       const data = (await res.json()) as any;
       return data.results || data.anime || data || [];
@@ -67,7 +124,7 @@ export async function getAnimelokMetadata(slug: string) {
     while (page < 10) {
       // Safety limit of 2500 episodes
       const url = `https://animelok.xyz/api/anime/${slug}/episodes-range?page=${page}&pageSize=${pageSize}`;
-      const res = await fetch(url, { headers: ANIMELOK_HEADERS });
+      const res = await fetchWithProxy(url, { headers: ANIMELOK_HEADERS });
       if (!res.ok) break;
 
       const data = (await res.json()) as any;
@@ -96,7 +153,7 @@ export async function getAnimelokMetadata(slug: string) {
 export async function getAnimelokSources(slug: string, ep: number) {
   try {
     const url = `https://animelok.xyz/api/anime/${slug}/episodes/${ep}`;
-    const res = await fetch(url, { headers: ANIMELOK_HEADERS });
+    const res = await fetchWithProxy(url, { headers: ANIMELOK_HEADERS });
     if (res.ok) {
       const data = (await res.json()) as any;
       const servers = data.episode?.servers || [];
