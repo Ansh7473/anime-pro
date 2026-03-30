@@ -89,7 +89,7 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
   } catch (e) {
     console.error(`[DesiDub] Both tracks failed for ${url}`);
     // If both fail, try one last desperate direct fetch to get whatever status code is there
-    return await fetchWithTimeout(url, options, 2000).catch(err => {
+    return await fetchWithTimeout(url, options, 2000).catch(() => {
         throw new Error("Network saturation/Total failure");
     });
   }
