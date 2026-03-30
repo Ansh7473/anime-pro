@@ -71,23 +71,13 @@ export async function getAnimelokMetadata(slug: string) {
       if (!res.ok) break;
 
       const data = (await res.json()) as any;
-      const eps = (data.episodes || []).map((ep: any) => {
-        let imageUrl = ep.img || '';
-        if (imageUrl.includes('proxy.animetsu.cc') || imageUrl.includes('img.animetsu.cc')) {
-          if (imageUrl.includes('https://', 8)) {
-            imageUrl = imageUrl.substring(imageUrl.indexOf('https://', 8));
-          } else {
-            imageUrl = ''; 
-          }
-        }
-        return {
-          number: ep.number,
-          title: ep.name,
-          image: imageUrl,
-          description: ep.description,
-          isFiller: ep.isFiller,
-        };
-      });
+      const eps = (data.episodes || []).map((ep: any) => ({
+        number: ep.number,
+        title: ep.name,
+        image: ep.img,
+        description: ep.description,
+        isFiller: ep.isFiller,
+      }));
 
       if (eps.length === 0) break;
       allEpisodes.push(...eps);

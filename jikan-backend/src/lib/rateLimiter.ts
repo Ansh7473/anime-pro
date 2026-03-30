@@ -54,13 +54,13 @@ export const animelokLimiter = new RateLimiter({
 });
 
 export const desidubLimiter = new RateLimiter({
-  maxRequests: 3,
-  windowMs: 15000, // 15 seconds
+  maxRequests: 10,
+  windowMs: 5000, // 5 seconds
 });
 
 export const animehindidubbedLimiter = new RateLimiter({
-  maxRequests: 3,
-  windowMs: 15000, // 15 seconds
+  maxRequests: 10,
+  windowMs: 5000, // 5 seconds
 });
 
 // Generic delay function for additional spacing between requests

@@ -40,6 +40,32 @@ const API_BASE = `${BASE_URL}/wp-json/wp/v2/posts`;
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+const getWPHeaders = () => ({
+  "User-Agent": USER_AGENT,
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Sec-Ch-Ua": '"Chromium";v="125", "Not.A/Brand";v="24"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "same-origin",
+});
+
+const fetchWithTimeout = async (url: string, options: any = {}) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 6000); 
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+};
+
 /**
  * Search for anime using WordPress API
  */
@@ -52,11 +78,8 @@ export async function searchAnimeHindiDubbedWP(
     const url = `${API_BASE}?search=${encodeURIComponent(query)}&per_page=10`;
     console.log("[AnimeHindiDubbed-WP] Fetching URL:", url);
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
+    const response = await fetchWithTimeout(url, {
+      headers: getWPHeaders(),
     });
 
     if (!response.ok) {
@@ -137,11 +160,8 @@ export async function getAnimeHindiDubbedInfoWP(
     console.log("[AnimeHindiDubbed-WP] Getting info for post ID:", postId);
 
     const url = `${API_BASE}/${postId}`;
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
+    const response = await fetchWithTimeout(url, {
+      headers: getWPHeaders(),
     });
 
     if (!response.ok) {
@@ -392,11 +412,8 @@ async function extractServerVideosFromPost(
 ): Promise<Record<string, AnimeHindiDubbedEpisode[]> | null> {
   try {
     const url = `${API_BASE}/${postId}`;
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
+    const response = await fetchWithTimeout(url, {
+      headers: getWPHeaders(),
     });
 
     if (!response.ok) {
