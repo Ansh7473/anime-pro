@@ -134,6 +134,41 @@ streamingRouter.get("/sources/animelok", async (c) => {
   return c.json({ provider: "Animelok", status: 404, message: "No sources found" }, 404);
 });
 
+// Lightweight slug resolver — returns animelok slug candidates for CLIENT-SIDE fetching.
+// The user's browser (residential IP) fetches directly from animelok.xyz — bypasses Railway IP block.
+streamingRouter.get("/animelok-slug", async (c) => {
+  const animeId = c.req.query("animeId");
+  const malId = animeId || "unknown";
+
+  const titles = await getAnimeTitles(malId);
+  if (titles.length === 0) return c.json({ error: "Title not found" }, 404);
+
+  const toKebab = (s: string) => s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  const baseSlugs = titles.slice(0, 3).map(toKebab);
+  const slugCandidates: string[] = [];
+
+  // Primary pattern: {title}-{malId} (observed in logs: one-piece-21, death-note-1535)
+  for (const base of baseSlugs) {
+    slugCandidates.push(`${base}-${malId}`);
+  }
+  // Secondary: raw title without ID
+  for (const base of baseSlugs) {
+    if (!slugCandidates.includes(base)) slugCandidates.push(base);
+  }
+
+  return c.json({
+    malId,
+    slugCandidates,
+    titles: titles.slice(0, 3),
+    // Frontend constructs: https://animelok.xyz/api/anime/{slug}/episodes/{ep}
+    apiTemplate: "https://animelok.xyz/api/anime/{slug}/episodes/{ep}",
+  });
+});
+
 // 2. DesiDub Provider Route
 streamingRouter.get("/sources/desidub", async (c) => {
   const animeId = c.req.query("animeId");

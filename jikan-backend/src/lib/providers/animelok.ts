@@ -61,7 +61,7 @@ const warmFlareSolverrSession = async (): Promise<void> => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cmd: "sessions.create", session: FS_SESSION }),
-    }, 10000).catch(() => {});
+    }, 10000).catch(() => { });
 
     // Visit homepage ONLY — watch page visits were crashing FlareSolverr Chrome tabs
     const homeRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
