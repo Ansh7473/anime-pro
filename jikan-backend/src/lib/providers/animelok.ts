@@ -47,44 +47,39 @@ console.info(`[Animelok] FLARESOLVERR_URL loaded: "${FLARESOLVERR_URL}" (length:
 const FS_SESSION = "animelok-session";
 let fsSessionWarmed = false;
 let fsSessionWarmExpiry = 0;
+let fsWarmingInProgress: Promise<void> | null = null;  // mutex — prevents concurrent warm-up floods
 
 const warmFlareSolverrSession = async (): Promise<void> => {
   if (fsSessionWarmed && Date.now() < fsSessionWarmExpiry) return;
+  // Mutex: if already warming, wait for the existing warm-up instead of starting another
+  if (fsWarmingInProgress) return fsWarmingInProgress;
 
-  console.info("[Animelok] Warming FlareSolverr session...");
-  // Create session (ignore error if it already exists)
-  await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd: "sessions.create", session: FS_SESSION }),
-  }, 10000).catch(() => {});
+  fsWarmingInProgress = (async () => {
+    console.info("[Animelok] Warming FlareSolverr session (homepage only)...");
+    // Create session (ignore error if it already exists)
+    await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "sessions.create", session: FS_SESSION }),
+    }, 10000).catch(() => {});
 
-  // Visit homepage to get CF clearance (non-fatal — FS service might be busy)
-  const homeResult = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz", session: FS_SESSION, maxTimeout: 30000 }),
-  }, 35000).catch((e: any) => { console.warn(`[Animelok] FS homepage warning: ${e.message}`); return null; });
+    // Visit homepage ONLY — watch page visits were crashing FlareSolverr Chrome tabs
+    const homeRes = await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz", session: FS_SESSION, maxTimeout: 30000 }),
+    }, 35000);
 
-  if (!homeResult) {
-    throw new Error("FlareSolverr unavailable (homepage visit failed)");
-  }
+    if (!homeRes.ok) throw new Error(`FlareSolverr HTTP ${homeRes.status} on homepage`);
+    const homeData = (await homeRes.json()) as any;
+    if (homeData.status !== "ok") throw new Error(`FlareSolverr warm failed: ${homeData.message}`);
 
-  const homeData = (await (homeResult as Response).json().catch(() => ({ status: "error" }))) as any;
-  if (homeData.status !== "ok") {
-    throw new Error(`FlareSolverr session warm failed: ${homeData.message || homeData.status}`);
-  }
+    fsSessionWarmed = true;
+    fsSessionWarmExpiry = Date.now() + 22 * 60 * 60 * 1000;
+    console.info("[Animelok] FlareSolverr session warmed");
+  })().finally(() => { fsWarmingInProgress = null; });
 
-  // Also visit a watch page for Referer context (non-fatal — this URL can return 500)
-  await fetchWithTimeout(`${FLARESOLVERR_URL}/v1`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd: "request.get", url: "https://animelok.xyz/watch/one-piece-episode-1", session: FS_SESSION, maxTimeout: 30000 }),
-  }, 35000).catch((e: any) => console.warn(`[Animelok] FS watch page warning (non-fatal): ${e.message}`));
-
-  fsSessionWarmed = true;
-  fsSessionWarmExpiry = Date.now() + 22 * 60 * 60 * 1000;
-  console.info("[Animelok] FlareSolverr session warmed");
+  return fsWarmingInProgress;
 };
 
 const flaresolverrFetch = async (url: string): Promise<Response> => {
@@ -118,7 +113,7 @@ const flaresolverrFetch = async (url: string): Promise<Response> => {
   if (data.status !== "ok" || !data.solution?.response) throw new Error(`FlareSolverr: ${data.status} - ${data.message}`);
 
   let responseText = data.solution.response as string;
-  console.info(`[Animelok] FlareSolverr raw preview (${responseText.length}): ${responseText.slice(0, 100)}`);
+  console.info(`[Animelok] FlareSolverr raw preview (${responseText.length}): ${responseText.slice(0, 120)}`);
 
   // Chrome's JSON viewer wraps JSON in: <html><body><pre>{"json":"here"}</pre></body></html>
   if (responseText.trim().startsWith("<")) {
@@ -126,14 +121,15 @@ const flaresolverrFetch = async (url: string): Promise<Response> => {
     if (preMatch?.[1]) {
       responseText = preMatch[1].trim();
     } else {
-      fsSessionWarmed = false;
-      throw new Error("FlareSolverr returned unrecognized HTML — resetting session");
+      // Unrecognized HTML — don't reset session (CF session is still valid, just unexpected response)
+      throw new Error("FlareSolverr returned unrecognized HTML");
     }
   }
 
+  // NOTE: Do NOT reset session on Unauthorized — the session IS valid, animelok just blocks
+  // Railway/datacenter IPs at the application layer. Resetting causes re-warm flood.
   if (responseText.startsWith("Unauthorized") || responseText.includes('"error":"unauthorized"')) {
-    fsSessionWarmed = false;
-    throw new Error("Animelok API unauthorized — resetting session");
+    throw new Error("Animelok API unauthorized (application-level IP block — session still valid)");
   }
 
   return new Response(responseText, { status: 200, headers: { "Content-Type": "application/json" } });
